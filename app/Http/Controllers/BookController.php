@@ -9,9 +9,23 @@ use App\Models\Shelf;
 
 class BookController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $books = Book::with(['category', 'shelf'])->latest()->paginate(10);
+        // Mulai Query
+        $query = Book::with(['category', 'shelf']);
+
+        // Jika ada input pencarian (search)
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('judul', 'like', "%{$search}%")
+                  ->orWhere('kode_buku', 'like', "%{$search}%")
+                  ->orWhere('pengarang', 'like', "%{$search}%");
+            });
+        }
+
+        // Ambil data (paginate 10)
+        $books = $query->latest()->paginate(10);
 
         return view('books.index', compact('books'));
     }

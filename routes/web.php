@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BookController;
+use App\Http\Controllers\LoanController;
+use App\Http\Controllers\MemberController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -12,9 +15,9 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
 
     // Route Dashboard dipindahkan dan dipertahankan di sini
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
     // DAFTAR ROUTE BUKU (Sesuai permintaan)
     // Route untuk menampilkan daftar semua buku
@@ -25,6 +28,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/books/{id}', [BookController::class, 'update'])->name('books.update');
     Route::delete('/books/{id}', [BookController::class, 'destroy'])->name('books.destroy');
 
+    // DAFTAR ROUTE PEMINJAMAN
+    Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
+    Route::get('/loans/create', [LoanController::class, 'create'])->name('loans.create');
+    Route::post('/loans', [LoanController::class, 'store'])->name('loans.store');
+    Route::put('/loans/{id}/return', [LoanController::class, 'returnLoan'])->name('loans.return');
+
+    Route::resource('members', MemberController::class);
     // Catatan: Route resource lainnya (create, store, edit, update, destroy)
     // akan ditambahkan di sini nantinya jika diperlukan.
 });
