@@ -24,6 +24,10 @@ class BookController extends Controller
             });
         }
 
+        if ($request->has('status') && $request->status == 'archived') {
+            $query->onlyTrashed(); // Hanya ambil yang sudah dihapus
+        }
+
         // Ambil data (paginate 10)
         $books = $query->latest()->paginate(10);
 
@@ -115,13 +119,54 @@ class BookController extends Controller
 
     public function destroy(string $id)
     {
-        // 1. Cari buku
         $book = Book::findOrFail($id);
 
-        // 2. Hapus
+        // --- LOGIC PENGECEKAN (SATPAM) ---
+        // Cek apakah buku ini ada di tabel loan_details dengan status 'dipinjam'
+        $sedangDipinjam = $book->loanDetails()
+                               ->where('status_item', 'dipinjam')
+                               ->exists();
+
+        if ($sedangDipinjam) {
+            // Jika ada, batalkan penghapusan dan kirim pesan error
+            return back()->with('error', 'GAGAL: Buku ini sedang dipinjam oleh siswa! Harap proses pengembalian terlebih dahulu.');
+        }
+        // ----------------------------------
+
         $book->delete();
 
-        // 3. Kembali dengan pesan sukses
-        return redirect()->route('books.index')->with('success', 'Buku berhasil dihapus permanen!');
+        return redirect()->route('books.index')->with('success', 'Buku berhasil dipindahkan ke Sampah.');
+    }
+
+    // 1. Tampilkan Halaman Sampah
+    public function trash()
+    {
+        // Ambil HANYA yang sudah dihapus (onlyTrashed)
+        $books = Book::onlyTrashed()->with(['category', 'shelf'])->latest()->paginate(10);
+        return view('books.trash', compact('books'));
+    }
+
+    // 2. Pulihkan Data (Restore)
+    public function restore($id)
+    {
+        // Cari di tong sampah, lalu restore
+        $book = Book::withTrashed()->findOrFail($id);
+        $book->restore();
+
+        return redirect()->route('books.trash')->with('success', 'Buku berhasil dipulihkan kembali ke katalog aktif.');
+    }
+
+    // 3. Hapus Permanen (Force Delete)
+    public function forceDelete($id)
+    {
+        $book = Book::withTrashed()->findOrFail($id);
+
+        if ($book->loanDetails()->count() > 0) {
+            return back()->with('error', 'GAGAL: Buku ini memiliki riwayat peminjaman (Histori). Data tidak bisa dihapus permanen demi integritas laporan.');
+        }
+
+        $book->forceDelete(); // Hapus selamanya dari DB
+
+        return redirect()->route('books.trash')->with('success', 'Buku berhasil dihapus permanen.');
     }
 }

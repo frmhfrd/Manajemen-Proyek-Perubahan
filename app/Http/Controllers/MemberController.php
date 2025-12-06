@@ -82,4 +82,33 @@ class MemberController extends Controller
         $member->delete();
         return redirect()->route('members.index')->with('success', 'Anggota berhasil dihapus!');
     }
+
+    // 1. Halaman Sampah
+    public function trash()
+    {
+        $members = Member::onlyTrashed()->latest()->paginate(10);
+        return view('members.trash', compact('members'));
+    }
+
+    // 2. Pulihkan (Restore)
+    public function restore($id)
+    {
+        $member = Member::withTrashed()->findOrFail($id);
+        $member->restore();
+        return redirect()->route('members.trash')->with('success', 'Data anggota berhasil dipulihkan.');
+    }
+
+    // 3. Hapus Permanen
+    public function forceDelete($id)
+    {
+        $member = Member::withTrashed()->findOrFail($id);
+
+        // Cek dulu apakah anggota ini punya hutang buku? (Optional Safety)
+        if($member->loans()->count() > 0) {
+            return back()->with('error', 'GAGAL: Anggota ini memiliki riwayat peminjaman di database. Hapus data transaksinya dulu jika ingin menghapus permanen.');
+        }
+
+        $member->forceDelete();
+        return redirect()->route('members.trash')->with('success', 'Data anggota dihapus permanen.');
+    }
 }
