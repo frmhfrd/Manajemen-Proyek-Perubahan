@@ -12,7 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('settings', function (Blueprint $table) {
-            $table->id();
+            $table->tinyIncrements('id'); // TinyInt cukup
+            $table->string('key', 50)->unique();
+            $table->text('value');
+            $table->string('type', 20); // text, number, boolean
             $table->timestamps();
         });
     }

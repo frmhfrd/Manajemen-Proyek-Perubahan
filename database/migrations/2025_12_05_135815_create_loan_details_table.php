@@ -13,6 +13,12 @@ return new class extends Migration
     {
         Schema::create('loan_details', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('loan_id')->constrained('loans')->onDelete('cascade');
+            $table->foreignId('book_id')->constrained('books');
+
+            $table->enum('status_item', ['dipinjam', 'kembali', 'hilang', 'rusak'])->default('dipinjam');
+            $table->text('kondisi_kembali')->nullable();
+
             $table->timestamps();
         });
     }
