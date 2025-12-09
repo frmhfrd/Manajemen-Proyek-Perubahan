@@ -92,6 +92,10 @@
                                     </td>
                                     <td class="px-6 py-4 text-center">
                                         <div class="flex justify-center space-x-2">
+
+                                            {{-- TOMBOL CETAK KARTU (Biru) --}}
+                                            <a href="{{ route('members.card', $member->id) }}" target="_blank" class="text-white bg-blue-500 hover:bg-blue-600 font-medium rounded-lg text-xs px-2 py-1.5 shadow" title="Cetak Kartu">Cetak</a>
+
                                             <a href="{{ route('members.edit', $member->id) }}" class="text-white bg-yellow-400 hover:bg-yellow-500 font-medium rounded-lg text-xs px-3 py-1.5">Edit</a>
 
                                             <form action="{{ route('members.destroy', $member->id) }}" method="POST" onsubmit="return confirm('Hapus anggota ini?');">

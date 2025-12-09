@@ -6,9 +6,10 @@ use App\Models\Loan;
 use App\Models\LoanDetail;
 use App\Models\Book;
 use App\Models\Member;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB; // Wajib untuk Transaction
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class LoanController extends Controller
@@ -17,7 +18,6 @@ class LoanController extends Controller
     {
         $query = Loan::with(['member', 'user', 'details']);
 
-        // Fitur Pencarian (Cari Kode Transaksi atau Nama Anggota)
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;
             $query->where('kode_transaksi', 'like', "%{$search}%")
@@ -28,119 +28,126 @@ class LoanController extends Controller
 
         $loans = $query->orderBy('id', 'desc')->paginate(10);
 
-        return view('loans.index', compact('loans'));
+        // OPTIMASI: Ambil nilai denda SEKALI saja di sini, lalu kirim ke View
+        // Agar tidak query berulang-ulang di dalam looping blade
+        $dendaPerHari = Setting::where('key', 'denda_harian')->value('value') ?? 500;
+
+        return view('loans.index', compact('loans', 'dendaPerHari'));
     }
 
-    // Halaman Form Peminjaman
     public function create()
     {
-        // Ambil member yang aktif saja
         $members = Member::where('status_aktif', true)->orderBy('nama_lengkap')->get();
-
-        // Ambil buku yang stoknya ADA saja
         $books = Book::where('stok_tersedia', '>', 0)->orderBy('judul')->get();
 
         return view('loans.create', compact('members', 'books'));
     }
 
-    // Logic "THE BOSS" (Simpan Transaksi)
     public function store(Request $request)
     {
-        // 1. Validasi Input
         $request->validate([
             'member_id' => 'required|exists:members,id',
-            'book_ids'  => 'required|array|min:1', // Harus pilih minimal 1 buku
-            'book_ids.*'=> 'exists:books,id',       // Pastikan bukunya valid
+            'book_ids'  => 'required|array|min:1',
+            'book_ids.*'=> 'exists:books,id',
         ]);
 
-        // 2. Database Transaction (Bungkus logic biar aman)
         try {
             DB::transaction(function () use ($request) {
+                $durasiPinjam = Setting::where('key', 'max_lama_pinjam')->value('value') ?? 7;
 
-                // A. Buat Header Transaksi (Tabel Loans)
+                // 1. Buat Header Transaksi
                 $loan = Loan::create([
-                    'kode_transaksi' => 'TRX-' . time(), // Generate kode unik simpel
+                    'kode_transaksi' => 'TRX-' . time(),
                     'member_id' => $request->member_id,
-                    'user_id'   => Auth::id(), // Petugas yang sedang login
+                    'user_id'   => Auth::id(),
                     'tgl_pinjam' => Carbon::now(),
-                    'tgl_wajib_kembali' => Carbon::now()->addDays(7), // Pinjam 7 hari (bisa ambil dari settings nanti)
-                    'tahun_ajaran' => '2024/2025', // Hardcode dulu, nanti bisa dinamis
-                    'status_transaksi' => 'berjalan',
+                    'tgl_wajib_kembali' => Carbon::now()->addDays((int)$durasiPinjam),
+                    'tahun_ajaran' => '2024/2025',
+                    'status_transaksi' => 'berjalan', // Default BERJALAN
                 ]);
 
-                // B. Loop setiap buku yang dipilih
+                // 2. Loop Buku
                 foreach ($request->book_ids as $book_id) {
-
-                    // 1. Ambil data buku
                     $book = Book::find($book_id);
-
-                    // Cek lagi stoknya (takutnya diserobot orang lain detik itu juga)
                     if ($book->stok_tersedia < 1) {
                         throw new \Exception("Stok buku {$book->judul} habis!");
                     }
 
-                    // 2. Masukkan ke Detail Transaksi (Tabel LoanDetails)
                     LoanDetail::create([
                         'loan_id' => $loan->id,
                         'book_id' => $book_id,
                         'status_item' => 'dipinjam',
                     ]);
 
-                    // 3. Kurangi Stok Buku (Update Tabel Books)
                     $book->decrement('stok_tersedia');
                 }
+
+                // HAPUS BAGIAN INI:
+                // Jangan hitung denda atau set 'selesai' saat BARU meminjam!
+                // Kode lama yang salah saya hapus dari sini.
             });
 
-            // Jika sukses semua
             return redirect()->route('loans.index')->with('success', 'Transaksi Peminjaman Berhasil!');
 
         } catch (\Exception $e) {
-            // Jika ada error (stok habis/db error), kembalikan ke form
             return back()->with('error', 'Gagal memproses: ' . $e->getMessage());
         }
     }
 
-    // Logic Pengembalian Buku
-    public function returnLoan(string $id)
+    public function returnLoan(Request $request, string $id)
     {
+        // 1. Ambil Data Transaksi
+        $loan = Loan::with('details')->findOrFail($id);
+
+        // --- SATPAM (PENCEGAH BUG STOK) ---
+        // Jika status sudah selesai, tolak proses!
+        if ($loan->status_transaksi == 'selesai') {
+            return back()->with('error', 'Transaksi ini sudah diselesaikan sebelumnya!');
+        }
+        // ----------------------------------
+
         try {
-            DB::transaction(function () use ($id) {
-                // 1. Cari Data Transaksi
-                $loan = Loan::with('details')->findOrFail($id);
+            DB::transaction(function () use ($loan) {
 
-                // Cek dulu, jangan sampai transaksi yang sudah selesai dikembalikan lagi (Bug prevention)
-                if ($loan->status_transaksi == 'selesai') {
-                    throw new \Exception("Transaksi ini sudah selesai!");
+                // 2. Logic Hitung Denda & Telat
+                $dendaPerHari = (int) (Setting::where('key', 'denda_harian')->value('value') ?? 500);
+
+                $tanggalKembali = Carbon::now()->startOfDay();
+                $jatuhTempo     = $loan->tgl_wajib_kembali->startOfDay();
+
+                $loan->tgl_kembali = Carbon::now();
+                $loan->total_denda = 0;
+
+                // Cek Telat
+                if ($tanggalKembali->gt($jatuhTempo)) {
+                    // Hitung hari telat
+                    $selisihHari = $tanggalKembali->diffInDays($jatuhTempo);
+                    $loan->total_denda = $selisihHari * $dendaPerHari;
                 }
 
-                // 2. Update Header Transaksi
-                $loan->tgl_kembali = Carbon::now(); // Tanggal hari ini
+                // 3. PENTING: Status AKHIR harus selalu 'selesai'
+                // Karena buku sudah diterima fisik oleh admin.
+                // Masalah bayar denda, itu urusan kasir (UI) yang memastikan uang diterima sebelum klik tombol ini.
                 $loan->status_transaksi = 'selesai';
-
-                // Cek Keterlambatan (Simple Logic)
-                // Jika hari ini > wajib kembali, maka status terlambat
-                if (Carbon::now()->gt($loan->tgl_wajib_kembali)) {
-                   $loan->status_transaksi = 'terlambat';
-                   // Di sini bisa tambah logic hitung denda kalau mau (nanti saja)
-                }
 
                 $loan->save();
 
-                // 3. Loop Detail Buku & Balikin Stok
+                // 4. Balikin Stok Buku
                 foreach ($loan->details as $detail) {
-                    // Update status item jadi 'kembali'
-                    $detail->update(['status_item' => 'kembali']);
-
-                    // Balikin stok buku (Increment)
-                    // Cari bukunya, lalu tambah stok tersedia +1
-                    Book::where('id', $detail->book_id)->increment('stok_tersedia');
+                    if ($detail->status_item !== 'kembali') { // Cek double protection
+                        $detail->update(['status_item' => 'kembali']);
+                        Book::where('id', $detail->book_id)->increment('stok_tersedia');
+                    }
                 }
             });
 
-            return back()->with('success', 'Buku berhasil dikembalikan! Stok sudah diperbarui.');
+            // Kirim Pesan WA "Terima Kasih" (Opsional, Logic ada di bawah)
+            // $this->sendWhatsApp($loan->member->no_telepon, "Terima kasih, buku sudah dikembalikan.");
+
+            return back()->with('success', 'Buku berhasil dikembalikan & Stok diperbarui.');
 
         } catch (\Exception $e) {
-            return back()->with('error', 'Gagal mengembalikan: ' . $e->getMessage());
+            return back()->with('error', 'Gagal: ' . $e->getMessage());
         }
     }
 }

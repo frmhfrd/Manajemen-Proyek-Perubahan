@@ -49,54 +49,102 @@
 
             </div>
 
-            {{-- Bagian 2: Aktivitas Terakhir --}}
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900 dark:text-gray-100">
-                    <h3 class="text-lg font-bold mb-4">Aktivitas Peminjaman Terakhir</h3>
+            {{-- Bagian 2: Grid Tabel & Grafik --}}
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left">
-                            <thead class="text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                                <tr>
-                                    <th class="px-4 py-3">Peminjam</th>
-                                    <th class="px-4 py-3">Tanggal Pinjam</th>
-                                    <th class="px-4 py-3">Status</th>
-                                    <th class="px-4 py-3">Petugas</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($recentLoans as $loan)
-                                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition">
-                                    <td class="px-4 py-3 font-medium">
-                                        {{ $loan->member->nama_lengkap }}
-                                        <div class="text-xs text-gray-500">{{ $loan->member->kelas }}</div>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        {{ $loan->tgl_pinjam->format('d M Y') }}
-                                        <div class="text-xs text-gray-500">{{ $loan->tgl_pinjam->diffForHumans() }}</div>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        @if($loan->status_transaksi == 'berjalan')
-                                            <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">Sedang Pinjam</span>
-                                        @elseif($loan->status_transaksi == 'selesai')
-                                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Selesai</span>
-                                        @else
-                                            <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">Terlambat</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-3">{{ $loan->user->name }}</td>
-                                </tr>
-                                @empty
-                                <tr>
-                                    <td colspan="4" class="px-4 py-3 text-center text-gray-500">Belum ada aktivitas transaksi.</td>
-                                </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                {{-- KOLOM KIRI: Aktivitas Terakhir (Lebar 2/3) --}}
+                <div class="lg:col-span-2 bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6 text-gray-900 dark:text-gray-100">
+                        <h3 class="text-lg font-bold mb-4">Aktivitas Peminjaman Terakhir</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-gray-100 dark:bg-gray-700 uppercase text-xs">
+                                    <tr>
+                                        <th class="px-4 py-3">Peminjam</th>
+                                        <th class="px-4 py-3">Tanggal</th>
+                                        <th class="px-4 py-3">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($recentLoans as $loan)
+                                    <tr class="border-b dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <td class="px-4 py-3 font-medium">
+                                            {{ $loan->member->nama_lengkap }}
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            {{ $loan->tgl_pinjam->format('d/m/y') }}
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            @if($loan->status_transaksi == 'berjalan')
+                                                <span class="text-yellow-600 font-bold text-xs">Pinjam</span>
+                                            @elseif($loan->status_transaksi == 'selesai')
+                                                <span class="text-green-600 font-bold text-xs">Selesai</span>
+                                            @else
+                                                <span class="text-red-600 font-bold text-xs">Telat</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr><td colspan="3" class="text-center py-2">Kosong</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
+
+                {{-- KOLOM KANAN: Grafik Statistik (Lebar 1/3) --}}
+                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6 text-gray-900 dark:text-gray-100 h-full">
+                        <h3 class="text-lg font-bold mb-4">Tren Peminjaman {{ date('Y') }}</h3>
+                        <div class="relative h-64 w-full">
+                            <canvas id="loanChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
         </div>
     </div>
+
+    {{-- Script Chart.js --}}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        const ctx = document.getElementById('loanChart');
+
+        new Chart(ctx, {
+            type: 'bar', // Bisa ganti 'line', 'pie', dll
+            data: {
+                // Ambil Label dari Controller (Jan, Feb, ...)
+                labels: {!! json_encode($labels) !!},
+                datasets: [{
+                    label: 'Jumlah Transaksi',
+                    // Ambil Data dari Controller (5, 10, 2...)
+                    data: {!! json_encode($data) !!},
+                    borderWidth: 1,
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)', // Warna Biru Transparan
+                    borderColor: 'rgb(59, 130, 246)', // Warna Biru Garis
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1 // Agar angka di sumbu Y bulat (gak ada 1.5 buku)
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false // Sembunyikan legenda biar bersih
+                    }
+                }
+            }
+        });
+    </script>
 </x-app-layout>

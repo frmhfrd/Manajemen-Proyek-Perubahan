@@ -65,12 +65,14 @@
                                             </form>
 
                                             {{-- Hapus Permanen --}}
-                                            <form action="{{ route('members.force_delete', $member->id) }}" method="POST" onsubmit="return confirm('PERINGATAN: Data anggota ini akan hilang selamanya beserta riwayatnya! Lanjutkan?');">
-                                                @csrf @method('DELETE')
-                                                <button type="submit" class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-xs px-3 py-1.5 shadow">
-                                                    Hapus Permanen
-                                                </button>
-                                            </form>
+                                            @if(Auth::user()->role == 'admin')
+                                                <form action="{{ route('members.force_delete', $member->id) }}" method="POST" onsubmit="return confirm('PERINGATAN: Data anggota ini akan hilang selamanya beserta riwayatnya! Lanjutkan?');">
+                                                    @csrf @method('DELETE')
+                                                    <button type="submit" class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-xs px-3 py-1.5 shadow">
+                                                        Hapus Permanen
+                                                    </button>
+                                                </form>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>

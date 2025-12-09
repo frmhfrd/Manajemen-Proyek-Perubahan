@@ -59,12 +59,14 @@
                                             </form>
 
                                             {{-- Tombol Hapus Permanen --}}
-                                            <form action="{{ route('books.force_delete', $book->id) }}" method="POST" onsubmit="return confirm('PERINGATAN: Buku ini akan hilang selamanya! Lanjutkan?');">
-                                                @csrf @method('DELETE')
-                                                <button type="submit" class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-xs px-3 py-1.5 shadow">
-                                                    Hapus Permanen
-                                                </button>
-                                            </form>
+                                            @if(Auth::user()->role == 'admin')
+                                                <form action="{{ route('books.force_delete', $book->id) }}" method="POST" onsubmit="return confirm('PERINGATAN: Buku ini akan hilang selamanya! Lanjutkan?');">
+                                                    @csrf @method('DELETE')
+                                                    <button type="submit" class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-xs px-3 py-1.5 shadow">
+                                                        Hapus Permanen
+                                                    </button>
+                                                </form>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>

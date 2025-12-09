@@ -82,6 +82,15 @@
                             {{ __('Profile') }}
                         </x-dropdown-link>
 
+                        {{-- HANYA TAMPIL JIKA ADMIN --}}
+                        @if(Auth::user()->role == 'admin')
+                            <x-dropdown-link :href="route('settings.index')">
+                                {{ __('Pengaturan') }}
+                            </x-dropdown-link>
+                        @endif
+
+                        <div class="border-t border-gray-100 dark:border-gray-600"></div>
+
                         <!-- Authentication -->
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf

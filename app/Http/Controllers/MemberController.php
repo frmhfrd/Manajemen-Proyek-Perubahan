@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Member;
+use Barryvdh\DomPDF\Facade\Pdf;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Http\Request;
 
 class MemberController extends Controller
@@ -110,5 +112,23 @@ class MemberController extends Controller
 
         $member->forceDelete();
         return redirect()->route('members.trash')->with('success', 'Data anggota dihapus permanen.');
+    }
+
+    public function printCard($id)
+    {
+        $member = Member::findOrFail($id);
+
+        // 1. Generate QR Code (Isinya adalah Kode Anggota)
+        // Kita ubah jadi Base64 Image agar bisa dibaca DOMPDF
+        $qrCode = base64_encode(QrCode::format('svg')->size(200)->generate($member->kode_anggota));
+
+        // 2. Load View
+        $pdf = Pdf::loadView('members.card', compact('member', 'qrCode'));
+
+        // 3. Set Ukuran Kertas: ID Card Portrait (54mm x 86mm)
+        // Konversi ke point: [0, 0, 153.07, 243.78]
+        $pdf->setPaper([0, 0, 153.07, 243.78], 'portrait');
+
+        return $pdf->stream('kartu-' . $member->kode_anggota . '.pdf');
     }
 }
