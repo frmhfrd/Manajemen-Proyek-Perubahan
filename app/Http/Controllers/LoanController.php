@@ -28,8 +28,7 @@ class LoanController extends Controller
 
         $loans = $query->orderBy('id', 'desc')->paginate(10);
 
-        // OPTIMASI: Ambil nilai denda SEKALI saja di sini, lalu kirim ke View
-        // Agar tidak query berulang-ulang di dalam looping blade
+        // OPTIMASI: Ambil nilai denda SEKALI saja
         $dendaPerHari = Setting::where('key', 'denda_harian')->value('value') ?? 500;
 
         return view('loans.index', compact('loans', 'dendaPerHari'));
@@ -63,7 +62,7 @@ class LoanController extends Controller
                     'tgl_pinjam' => Carbon::now(),
                     'tgl_wajib_kembali' => Carbon::now()->addDays((int)$durasiPinjam),
                     'tahun_ajaran' => '2024/2025',
-                    'status_transaksi' => 'berjalan', // Default BERJALAN
+                    'status_transaksi' => 'berjalan',
                 ]);
 
                 // 2. Loop Buku
@@ -81,10 +80,6 @@ class LoanController extends Controller
 
                     $book->decrement('stok_tersedia');
                 }
-
-                // HAPUS BAGIAN INI:
-                // Jangan hitung denda atau set 'selesai' saat BARU meminjam!
-                // Kode lama yang salah saya hapus dari sini.
             });
 
             return redirect()->route('loans.index')->with('success', 'Transaksi Peminjaman Berhasil!');
@@ -99,12 +94,10 @@ class LoanController extends Controller
         // 1. Ambil Data Transaksi
         $loan = Loan::with('details')->findOrFail($id);
 
-        // --- SATPAM (PENCEGAH BUG STOK) ---
-        // Jika status sudah selesai, tolak proses!
+        // SATPAM: Jika status sudah selesai, tolak proses!
         if ($loan->status_transaksi == 'selesai') {
             return back()->with('error', 'Transaksi ini sudah diselesaikan sebelumnya!');
         }
-        // ----------------------------------
 
         try {
             DB::transaction(function () use ($loan) {
@@ -120,34 +113,125 @@ class LoanController extends Controller
 
                 // Cek Telat
                 if ($tanggalKembali->gt($jatuhTempo)) {
-                    // Hitung hari telat
                     $selisihHari = $tanggalKembali->diffInDays($jatuhTempo);
                     $loan->total_denda = $selisihHari * $dendaPerHari;
                 }
 
-                // 3. PENTING: Status AKHIR harus selalu 'selesai'
-                // Karena buku sudah diterima fisik oleh admin.
-                // Masalah bayar denda, itu urusan kasir (UI) yang memastikan uang diterima sebelum klik tombol ini.
+                // 3. Status AKHIR harus selalu 'selesai'
                 $loan->status_transaksi = 'selesai';
 
                 $loan->save();
 
                 // 4. Balikin Stok Buku
                 foreach ($loan->details as $detail) {
-                    if ($detail->status_item !== 'kembali') { // Cek double protection
+                    if ($detail->status_item !== 'kembali') {
                         $detail->update(['status_item' => 'kembali']);
                         Book::where('id', $detail->book_id)->increment('stok_tersedia');
                     }
                 }
             });
 
-            // Kirim Pesan WA "Terima Kasih" (Opsional, Logic ada di bawah)
-            // $this->sendWhatsApp($loan->member->no_telepon, "Terima kasih, buku sudah dikembalikan.");
-
             return back()->with('success', 'Buku berhasil dikembalikan & Stok diperbarui.');
 
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal: ' . $e->getMessage());
+        }
+    }
+
+    // Cek Status Pembayaran Manual ke Midtrans (Per Transaksi)
+    public function checkPaymentStatus($id)
+    {
+        $loan = Loan::findOrFail($id);
+
+        if (empty($loan->midtrans_order_id)) {
+            return back()->with('error', 'Transaksi ini belum memiliki Order ID Midtrans.');
+        }
+
+        // Konfigurasi Midtrans
+        \Midtrans\Config::$serverKey = config('midtrans.server_key');
+        \Midtrans\Config::$isProduction = config('midtrans.is_production');
+        \Midtrans\Config::$isSanitized = config('midtrans.is_sanitized');
+        \Midtrans\Config::$is3ds = config('midtrans.is_3ds');
+
+        try {
+            // TANYA LANGSUNG KE MIDTRANS
+            $status = \Midtrans\Transaction::status($loan->midtrans_order_id);
+
+            // Logic Update Status Database
+                /** @var object $status "Hei Editor, percayalah sama saya, variabel $status ini isinya OBJECT, bukan Array. Jadi jangan dikasih warna merah ya."*/
+            if ($status->transaction_status == 'settlement' || $status->transaction_status == 'capture') {
+                $loan->update([
+                    'status_pembayaran' => 'paid',
+                    'tipe_pembayaran'   => 'online'
+                ]);
+                return back()->with('success', 'Status berhasil diperbarui: LUNAS (Settlement).');
+            }
+            else if ($status->transaction_status == 'pending') {
+                $loan->update(['status_pembayaran' => 'pending']);
+                return back()->with('warning', 'Status di Midtrans masih PENDING.');
+            }
+            else if ($status->transaction_status == 'expire') {
+                $loan->update(['status_pembayaran' => 'unpaid', 'midtrans_url' => null]);
+                return back()->with('error', 'Link pembayaran sudah KADALUARSA. Silakan generate ulang.');
+            }
+
+            return back()->with('info', 'Status saat ini: ' . $status->transaction_status);
+
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gagal cek ke Midtrans: ' . $e->getMessage());
+        }
+    }
+
+    // Refresh Semua Status Pending Sekaligus (Massal)
+    public function refreshAllStatus()
+    {
+        // 1. Ambil semua transaksi yang 'pending' DAN punya Order ID
+        $pendingLoans = Loan::where('status_pembayaran', 'pending')
+                            ->whereNotNull('midtrans_order_id')
+                            ->get();
+
+        if ($pendingLoans->isEmpty()) {
+            return back()->with('info', 'Tidak ada transaksi pending yang perlu dicek.');
+        }
+
+        // 2. Setup Midtrans
+        \Midtrans\Config::$serverKey = config('midtrans.server_key');
+        \Midtrans\Config::$isProduction = config('midtrans.is_production');
+        \Midtrans\Config::$isSanitized = config('midtrans.is_sanitized');
+        \Midtrans\Config::$is3ds = config('midtrans.is_3ds');
+
+        $updatedCount = 0;
+
+        // 3. Loop dan Cek Satu per Satu
+        foreach ($pendingLoans as $loan) {
+            try {
+                // Panggil API Midtrans
+                $status = \Midtrans\Transaction::status($loan->midtrans_order_id);
+
+                // Cek Statusnya
+                /** @var object $status "Hei Editor, percayalah sama saya, variabel $status ini isinya OBJECT, bukan Array. Jadi jangan dikasih warna merah ya."*/
+                if ($status->transaction_status == 'settlement' || $status->transaction_status == 'capture') {
+                    $loan->update([
+                        'status_pembayaran' => 'paid',
+                        'tipe_pembayaran'   => 'online'
+                    ]);
+                    $updatedCount++;
+                }
+                else if ($status->transaction_status == 'expire') {
+                    $loan->update(['status_pembayaran' => 'unpaid', 'midtrans_url' => null]);
+                }
+                // Jika masih pending, biarkan saja
+            } catch (\Exception $e) {
+                continue; // Skip kalau ada error koneksi di satu transaksi
+            }
+        }
+
+        // 4. Return Pesan sesuai Hasil (PERBAIKAN LOGIKA PESAN)
+        if ($updatedCount > 0) {
+            return back()->with('success', "Sukses! {$updatedCount} transaksi berhasil diperbarui menjadi LUNAS.");
+        } else {
+            // Jika 0, beri pesan Info agar user tidak bingung
+            return back()->with('info', 'Pengecekan selesai. Belum ada pembayaran baru yang masuk (Status masih Pending di Midtrans).');
         }
     }
 }

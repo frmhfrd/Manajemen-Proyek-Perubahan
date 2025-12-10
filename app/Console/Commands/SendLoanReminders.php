@@ -51,11 +51,23 @@ class SendLoanReminders extends Command
 
             if ($totalDenda > 0 && $loan->member->no_telepon) {
 
+                // --- LOGIC BARU: CEK KADALUARSA ---
+                // Jika URL sudah ada, TAPI sudah dibuat lebih dari 7 hari yang lalu
+                // Maka anggap saja kosong (biar digenerate ulang)
+                if (!empty($loan->midtrans_url)) {
+                    $tanggalBuatLink = Carbon::parse($loan->updated_at);
+                    if (now()->diffInDays($tanggalBuatLink) >= 7) {
+                        $loan->midtrans_url = null; // Reset biar masuk ke if di bawah
+                        $this->info("Link lama expired, generate ulang untuk: " . $loan->member->nama_lengkap);
+                    }
+                }
+
                 // --- LOGIC MIDTRANS GENERATOR ---
                 // Cek apakah link sudah ada? Jika belum/kosong, buat baru.
                 if (empty($loan->midtrans_url)) {
 
-                    $orderId = 'DENDA-' . $loan->id . '-' . time(); // ID Unik: DENDA-1-17000000
+                    // Gunakan time() agar order_id selalu unik setiap generate ulang
+                    $orderId = 'DENDA-' . $loan->id . '-' . time();
 
                     $params = [
                         'transaction_details' => [
@@ -71,18 +83,24 @@ class SendLoanReminders extends Command
                             'price' => $totalDenda,
                             'quantity' => 1,
                             'name' => "Denda Telat {$telatHari} Hari"
-                        ]]
+                        ]],
+                        // SETTING EXPIRY (PENTING)
+                        'expiry' => [
+                            'start_time' => date("Y-m-d H:i:s O"),
+                            'unit' => 'days',
+                            'duration' => 7
+                        ],
                     ];
 
                     try {
                         // Minta Link ke Midtrans
                         $paymentUrl = Snap::createTransaction($params)->redirect_url;
 
-                        // Simpan ke Database agar besok gak generate ulang (link midtrans valid lama)
+                        // Simpan ke Database
                         $loan->update([
                             'midtrans_order_id' => $orderId,
                             'midtrans_url' => $paymentUrl,
-                            'status_pembayaran' => 'pending', // Menunggu bayar
+                            'status_pembayaran' => 'pending',
                             'tipe_pembayaran' => 'online'
                         ]);
 
@@ -90,7 +108,7 @@ class SendLoanReminders extends Command
 
                     } catch (\Exception $e) {
                         $this->error("Gagal Midtrans: " . $e->getMessage());
-                        continue; // Skip ke siswa berikutnya kalau error
+                        continue;
                     }
                 }
 

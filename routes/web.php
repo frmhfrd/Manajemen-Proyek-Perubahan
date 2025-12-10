@@ -48,7 +48,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
     Route::get('/loans/create', [LoanController::class, 'create'])->name('loans.create');
     Route::post('/loans', [LoanController::class, 'store'])->name('loans.store');
+    Route::get('/loans/refresh-all', [LoanController::class, 'refreshAllStatus'])->name('loans.refresh_all');
+    Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
     Route::put('/loans/{id}/return', [LoanController::class, 'returnLoan'])->name('loans.return');
+    Route::put('/loans/{id}/check-status', [LoanController::class, 'checkPaymentStatus'])->name('loans.check_status');
 
 
     // --- MODUL MASTER DATA (Kategori & Rak) ---

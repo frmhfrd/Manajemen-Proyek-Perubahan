@@ -36,91 +36,136 @@
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
 
-                    {{-- Search Bar --}}
-                    <form action="{{ route('loans.index') }}" method="GET" class="mb-6">
-                        <div class="flex gap-2 max-w-md">
-                            <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Kode Transaksi / Nama Siswa..."
-                                class="w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-700">Cari</button>
-                        </div>
-                    </form>
+                    {{-- Header Tools: Search & Refresh --}}
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
 
-                    {{-- Tabel Modern --}}
-                    <div class="    ">
+                        {{-- Kiri: Search Bar --}}
+                        <form action="{{ route('loans.index') }}" method="GET" class="w-full md:w-1/2">
+                            <div class="flex gap-2">
+                                <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Kode Transaksi / Nama Siswa..."
+                                    class="w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-700">Cari</button>
+                            </div>
+                        </form>
+
+                        {{-- Kanan: Tombol Refresh Status Massal --}}
+                        <a href="{{ route('loans.refresh_all') }}" class="flex items-center gap-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-300 font-bold py-2 px-4 rounded-lg transition shadow-sm" title="Cek status pembayaran ke Midtrans untuk semua transaksi pending">
+                            {{-- Icon Refresh Putar --}}
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Refresh Status Bayar
+                        </a>
+
+                    </div>
+
+                    {{-- Tabel --}}
+                    <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
                         <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                             <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                 <tr>
+                                    {{-- Header Kita Rapikan --}}
                                     <th class="px-6 py-3">Kode & Petugas</th>
                                     <th class="px-6 py-3">Peminjam</th>
-                                    <th class="px-6 py-3">Tanggal</th>
+                                    <th class="px-6 py-3">Jatuh Tempo</th> {{-- Ganti Label Biar Jelas --}}
                                     <th class="px-6 py-3 text-center">Buku</th>
-                                    <th class="px-6 py-3 text-center">Status</th>
+                                    <th class="px-6 py-3 text-center">Status Sirkulasi</th> {{-- KOLOM 1 --}}
+                                    <th class="px-6 py-3 text-center">Status Denda</th>     {{-- KOLOM 2 (BARU) --}}
                                     <th class="px-6 py-3 text-center">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($loans as $loan)
                                 <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition">
+
+                                    {{-- 1. Kode --}}
                                     <td class="px-6 py-4">
                                         <div class="font-bold text-gray-900 dark:text-white">{{ $loan->kode_transaksi }}</div>
                                         <div class="text-xs">{{ $loan->user->name }}</div>
                                     </td>
+
+                                    {{-- 2. Peminjam --}}
                                     <td class="px-6 py-4">
                                         <div class="font-medium text-gray-900 dark:text-white">{{ $loan->member->nama_lengkap }}</div>
                                         <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">{{ $loan->member->kelas }}</span>
                                     </td>
+
+                                    {{-- 3. Tanggal (Fokus ke Tempo saja biar hemat tempat) --}}
                                     <td class="px-6 py-4">
-                                        <div class="text-xs text-gray-500">Pinjam: {{ $loan->tgl_pinjam->format('d M Y') }}</div>
-                                        <div class="text-xs font-bold {{ $loan->tgl_wajib_kembali->isPast() && $loan->status_transaksi != 'selesai' ? 'text-red-600' : 'text-blue-600' }}">
-                                            Tempo: {{ $loan->tgl_wajib_kembali->format('d M Y') }}
+                                        <div class="text-xs text-gray-400">Pinjam: {{ $loan->tgl_pinjam->format('d/m/y') }}</div>
+                                        <div class="font-bold {{ $loan->tgl_wajib_kembali->isPast() && $loan->status_transaksi == 'berjalan' ? 'text-red-600' : 'text-blue-600' }}">
+                                            {{ $loan->tgl_wajib_kembali->format('d M Y') }}
                                         </div>
                                     </td>
+
+                                    {{-- 4. Jumlah Buku --}}
                                     <td class="px-6 py-4 text-center">
                                         <span class="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-0.5 rounded">
                                             {{ $loan->details->count() }} Item
                                         </span>
                                     </td>
+
+                                    {{-- 5. KOLOM BARU: STATUS SIRKULASI (Fisik Buku) --}}
                                     <td class="px-6 py-4 text-center">
                                         @if($loan->status_transaksi == 'selesai')
-                                            <span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">Selesai</span>
-
-                                            @if($loan->total_denda > 0)
-                                                <div class="mt-1 text-xs text-red-600 font-bold">
-                                                    Denda: Rp {{ number_format($loan->total_denda, 0, ',', '.') }}
-                                                </div>
-                                            @endif
-
+                                            <span class="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs font-bold px-2.5 py-1 rounded-full border border-green-200">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                                Kembali
+                                            </span>
+                                        @elseif($loan->tgl_wajib_kembali->isPast() && $loan->status_transaksi == 'berjalan')
+                                            <span class="inline-flex items-center gap-1 bg-red-100 text-red-800 text-xs font-bold px-2.5 py-1 rounded-full border border-red-200 animate-pulse">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                Terlambat
+                                            </span>
                                         @elseif($loan->status_transaksi == 'terlambat')
-                                            <span class="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded">Terlambat</span>
-
-                                            @php
-                                                $telatHari = now()->startOfDay()->diffInDays($loan->tgl_wajib_kembali->startOfDay());
-                                                $estimasi = $telatHari * $dendaPerHari;
-                                            @endphp
-
-                                            <div class="mt-1 text-xs text-red-500">
-                                                Est. Denda: Rp {{ number_format($estimasi, 0, ',', '.') }}
-                                            </div>
-
+                                             {{-- Kasus sudah dikembalikan tapi status historynya terlambat --}}
+                                            <span class="bg-red-50 text-red-600 text-xs font-bold px-2.5 py-1 rounded-full border border-red-100">
+                                                Riwayat Telat
+                                            </span>
                                         @else
-                                            <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded">Berjalan</span>
+                                            <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-2.5 py-1 rounded-full border border-yellow-200">
+                                                Dipinjam
+                                            </span>
                                         @endif
                                     </td>
+
+                                    {{-- 6. KOLOM BARU: STATUS DENDA (Keuangan) --}}
+                                    <td class="px-6 py-4 text-center">
+                                        @if($loan->status_pembayaran == 'paid')
+                                            <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-1 rounded border border-blue-200 block w-fit mx-auto">
+                                                LUNAS (Midtrans)
+                                            </span>
+                                        @elseif($loan->status_pembayaran == 'pending')
+                                            <span class="bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-1 rounded border border-orange-200 block w-fit mx-auto">
+                                                Menunggu Bayar
+                                            </span>
+                                            {{-- Link Refresh Individu SUDAH DIHAPUS sesuai request --}}
+                                        @elseif($loan->tgl_wajib_kembali->isPast() && $loan->status_transaksi == 'berjalan')
+                                            {{-- Jika telat tapi belum generate link --}}
+                                            <span class="text-gray-400 text-[10px] italic">Belum Tagih</span>
+                                        @else
+                                            <span class="text-gray-300 text-xs">-</span>
+                                        @endif
+                                    </td>
+
+                                    {{-- 7. Aksi --}}
                                     <td class="px-6 py-4 text-center">
                                         @if($loan->status_transaksi != 'selesai')
                                             <button type="button"
-                                                onclick="openReturnModal('{{ route('loans.return', $loan->id) }}', '{{ $loan->kode_transaksi }}', '{{ $loan->member->nama_lengkap }}', '{{ $loan->tgl_wajib_kembali->format('Y-m-d') }}')"
-                                                class="text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-xs px-3 py-1.5 shadow">
+                                                onclick="openReturnModal('{{ route('loans.return', $loan->id) }}', '{{ $loan->kode_transaksi }}', '{{ $loan->member->nama_lengkap }}', '{{ $loan->tgl_wajib_kembali->format('Y-m-d') }}', '{{ $loan->status_pembayaran }}')"
+                                                class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-xs px-3 py-1.5 shadow">
                                                 Kembalikan
                                             </button>
                                         @else
-                                            <span class="text-gray-400 text-xs">-</span>
+                                            <span class="text-gray-300 text-xs">Selesai</span>
                                         @endif
                                     </td>
                                 </tr>
                                 @empty
                                 <tr>
-                                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">Belum ada transaksi.</td>
+                                    <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                                        Belum ada data transaksi.
+                                    </td>
                                 </tr>
                                 @endforelse
                             </tbody>
@@ -176,7 +221,9 @@
                                             <input id="konfirmasiBayar" type="checkbox" required class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
                                         </div>
                                         <div class="ml-3 text-sm">
-                                            <label for="konfirmasiBayar" class="font-medium text-gray-700">Saya menyatakan siswa SUDAH membayar lunas denda di atas.</label>
+                                            <label id="labelBayar" for="konfirmasiBayar" class="font-medium text-gray-700">
+                                                Saya menyatakan siswa SUDAH membayar lunas denda di atas.
+                                            </label>
                                         </div>
                                     </div>
                                 </div>
@@ -206,30 +253,30 @@
         // Ambil tarif denda dari PHP variable yg dikirim controller
         const tarifDenda = {{ $dendaPerHari ?? 500 }};
 
-        function openReturnModal(url, kode, nama, tglTempo) {
+        // Update parameter fungsi: tambah 'statusBayar' di akhir
+        function openReturnModal(url, kode, nama, tglTempo, statusBayar) {
             document.getElementById('returnForm').action = url;
             document.getElementById('modalKode').innerText = kode;
             document.getElementById('modalNama').innerText = nama;
 
-            // Hitung Selisih Hari (JS Logic)
+            // ... (Logika hitung hari sama seperti sebelumnya) ...
             const today = new Date();
-            today.setHours(0,0,0,0); // Reset jam jadi 00:00
-
+            today.setHours(0,0,0,0);
             const tempo = new Date(tglTempo);
             tempo.setHours(0,0,0,0);
-
-            // Hitung beda waktu (miliseconds)
             const diffTime = today - tempo;
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+            // Element UI
             const dendaArea = document.getElementById('dendaArea');
             const infoNormal = document.getElementById('infoNormal');
             const checkbox = document.getElementById('konfirmasiBayar');
-            const btnSubmit = document.getElementById('btnSubmit');
 
-            // Reset State
+            // Reset
             checkbox.checked = false;
             checkbox.removeAttribute('required');
+            checkbox.disabled = false;
+            document.getElementById('labelBayar').innerText = "Saya menyatakan siswa SUDAH membayar lunas denda di atas.";
 
             if (diffDays > 0) {
                 // KENA DENDA
@@ -241,8 +288,18 @@
                 document.getElementById('telatHari').innerText = diffDays;
                 document.getElementById('nominalDenda').innerText = new Intl.NumberFormat('id-ID').format(totalDenda);
 
-                // Wajib centang kalau mau submit
-                checkbox.setAttribute('required', 'required');
+                // --- LOGIKA BARU: CEK STATUS MIDTRANS ---
+                if (statusBayar === 'paid') {
+                    // Jika sudah lunas via Midtrans
+                    checkbox.checked = true;       // Otomatis centang
+                    checkbox.disabled = true;      // Gak bisa diubah
+                    document.getElementById('labelBayar').innerHTML = "<span class='text-green-600 font-bold'>SUDAH LUNAS VIA MIDTRANS ✅</span>";
+                    // Tidak perlu required karena sudah auto-checked (walau disabled value gak kirim, di controller gak cek checkbox ini)
+                } else {
+                    // Jika belum bayar (Tunai)
+                    checkbox.setAttribute('required', 'required');
+                }
+                // ----------------------------------------
 
             } else {
                 // TEPAT WAKTU
