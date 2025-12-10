@@ -62,6 +62,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // --- MODUL LAPORAN ---
     Route::get('/reports/print', [ReportController::class, 'print'])->name('reports.print');
 
+    // MODUL STOCK OPNAME
+    Route::resource('stock-opnames', \App\Http\Controllers\StockOpnameController::class);
+
 
     // ==============================================================================
     // GROUP 2: ADMIN ONLY (Hanya Admin, Pustakawan DILARANG Masuk)

@@ -4,9 +4,8 @@
             <h2 class="font-semibold text-xl text-red-600 leading-tight">
                 {{ __('Sampah Buku (Deleted Items)') }}
             </h2>
-            {{-- Tombol Kembali ke Index --}}
-            <a href="{{ route('books.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition">
-                &larr; Kembali ke Daftar Buku
+           <a href="{{ route('books.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition">
+                &larr; Kembali
             </a>
         </div>
     </x-slot>
