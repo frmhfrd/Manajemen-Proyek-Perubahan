@@ -12,6 +12,15 @@
 
     <div class="py-12">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+
+            {{-- Alert Sukses --}}
+            @if(session('success'))
+                <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                    <strong class="font-bold">Berhasil!</strong>
+                    <span class="block sm:inline">{{ session('success') }}</span>
+                </div>
+            @endif
+
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
 
@@ -19,8 +28,9 @@
                         @csrf
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {{-- ... (Input Form Tetap Sama) ... --}}
 
-                            {{-- Kode Anggota (NIS/NIP) --}}
+                            {{-- Kode Anggota --}}
                             <div>
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Nomor Induk (NIS/NIP)</label>
                                 <input type="text" name="kode_anggota" value="{{ old('kode_anggota') }}"
@@ -45,7 +55,7 @@
                                 </select>
                             </div>
 
-                            {{-- Kelas (Opsional) --}}
+                            {{-- Kelas --}}
                             <div>
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Kelas (Jika Siswa)</label>
                                 <input type="text" name="kelas" value="{{ old('kelas') }}" placeholder="Contoh: 4A, 6B"
@@ -64,12 +74,21 @@
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Alamat Lengkap</label>
                                 <textarea name="alamat" rows="3" class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">{{ old('alamat') }}</textarea>
                             </div>
-
                         </div>
 
-                        <div class="mt-6 flex justify-end gap-2">
-                            <a href="{{ route('members.index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Batal</a>
-                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Simpan Anggota</button>
+                        {{-- Update Bagian Tombol --}}
+                        <div class="mt-8 flex justify-end gap-3">
+                            <a href="{{ route('members.index') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded transition">
+                                Batal
+                            </a>
+
+                            <button type="submit" name="action" value="save_and_create" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition">
+                                Simpan & Daftar Lagi
+                            </button>
+
+                            <button type="submit" name="action" value="save" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition">
+                                Simpan Anggota
+                            </button>
                         </div>
 
                     </form>

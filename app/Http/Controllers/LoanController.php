@@ -51,39 +51,52 @@ class LoanController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($request) {
-                $durasiPinjam = Setting::where('key', 'max_lama_pinjam')->value('value') ?? 7;
+            // Gunakan variabel untuk menangkap hasil return dari dalam transaction
+            $newLoan = DB::transaction(function () use ($request) {
+
+                // Ambil setting durasi (default 7 hari)
+                $durasiPinjam = \App\Models\Setting::where('key', 'max_lama_pinjam')->value('value') ?? 7;
 
                 // 1. Buat Header Transaksi
-                $loan = Loan::create([
-                    'kode_transaksi' => 'TRX-' . time(),
-                    'member_id' => $request->member_id,
-                    'user_id'   => Auth::id(),
-                    'tgl_pinjam' => Carbon::now(),
-                    'tgl_wajib_kembali' => Carbon::now()->addDays((int)$durasiPinjam),
-                    'tahun_ajaran' => '2024/2025',
-                    'status_transaksi' => 'berjalan',
-                    'tahun_ajaran' => (date('m') > 6) ? date('Y').'/'.(date('Y')+1) : (date('Y')-1).'/'.date('Y'),
+                $loan = \App\Models\Loan::create([
+                    'kode_transaksi'    => 'TRX-' . time(),
+                    'member_id'         => $request->member_id,
+                    'user_id'           => auth()->id(),
+                    'tgl_pinjam'        => now(),
+                    'tgl_wajib_kembali' => now()->addDays((int)$durasiPinjam),
+                    'status_transaksi'  => 'berjalan',
+                    'status_pembayaran' => 'unpaid',
+                    'total_denda'       => 0,
+                    // Logika Tahun Ajaran (Juli ke atas = Tahun Depan, Januari-Juni = Tahun Lalu)
+                    'tahun_ajaran'      => (date('m') > 6) ? date('Y').'/'.(date('Y')+1) : (date('Y')-1).'/'.date('Y'),
                 ]);
 
-                // 2. Loop Buku
+                // 2. Loop Buku & Kurangi Stok
                 foreach ($request->book_ids as $book_id) {
-                    $book = Book::find($book_id);
+                    $book = \App\Models\Book::find($book_id);
+
+                    // Cek stok lagi untuk keamanan ganda
                     if ($book->stok_tersedia < 1) {
-                        throw new \Exception("Stok buku {$book->judul} habis!");
+                        throw new \Exception("Stok buku '{$book->judul}' habis!");
                     }
 
-                    LoanDetail::create([
-                        'loan_id' => $loan->id,
-                        'book_id' => $book_id,
+                    \App\Models\LoanDetail::create([
+                        'loan_id'     => $loan->id,
+                        'book_id'     => $book_id,
                         'status_item' => 'dipinjam',
                     ]);
 
                     $book->decrement('stok_tersedia');
                 }
+
+                // PENTING: Kembalikan objek loan agar bisa dipakai di luar transaction
+                return $loan;
             });
 
-            return redirect()->route('loans.index')->with('success', 'Transaksi Peminjaman Berhasil!');
+            // Redirect ke Index membawa data 'new_loan' untuk memicu Modal
+            return redirect()->route('loans.index')
+                ->with('success', 'Transaksi Peminjaman Berhasil!')
+                ->with('new_loan', $newLoan); // <--- INI PENTING UNTUK MODAL
 
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal memproses: ' . $e->getMessage());

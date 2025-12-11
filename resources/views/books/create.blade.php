@@ -12,20 +12,29 @@
 
     <div class="py-12">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+
+            {{-- Tambahkan Alert Sukses di sini agar muncul saat 'Simpan & Lanjut' --}}
+            @if(session('success'))
+                <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                    <strong class="font-bold">Berhasil!</strong>
+                    <span class="block sm:inline">{{ session('success') }}</span>
+                </div>
+            @endif
+
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
 
-                    {{-- Form Mulai --}}
                     <form action="{{ route('books.store') }}" method="POST">
-                        @csrf {{-- Token Keamanan Wajib Laravel --}}
+                        @csrf
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {{-- ... (Bagian Input Form Tetap Sama) ... --}}
 
                             {{-- Kode Buku --}}
                             <div>
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Kode Buku / ISBN</label>
                                 <input type="text" name="kode_buku" value="{{ old('kode_buku') }}"
-                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
                                 @error('kode_buku') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
                             </div>
 
@@ -33,64 +42,72 @@
                             <div>
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Judul Buku</label>
                                 <input type="text" name="judul" value="{{ old('judul') }}"
-                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
                             </div>
 
                             {{-- Pengarang --}}
                             <div>
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Pengarang</label>
                                 <input type="text" name="pengarang" value="{{ old('pengarang') }}"
-                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
                             </div>
 
                             {{-- Penerbit --}}
                             <div>
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Penerbit</label>
                                 <input type="text" name="penerbit" value="{{ old('penerbit') }}"
-                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             </div>
 
                             {{-- Tahun Terbit --}}
                             <div>
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Tahun Terbit</label>
                                 <input type="number" name="tahun_terbit" value="{{ old('tahun_terbit') }}"
-                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             </div>
 
                             {{-- Stok Awal --}}
                             <div>
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Jumlah Stok</label>
                                 <input type="number" name="stok_total" value="{{ old('stok_total', 1) }}" min="1"
-                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                                    class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
                             </div>
 
-                            {{-- Kategori (Dropdown) --}}
+                            {{-- Kategori --}}
                             <div>
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Kategori</label>
-                                <select name="kategori_id" class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <select name="kategori_id" class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                     @foreach($categories as $cat)
                                         <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
 
-                            {{-- Rak (Dropdown) --}}
+                            {{-- Rak --}}
                             <div>
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Lokasi Rak</label>
-                                <select name="rak_id" class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <select name="rak_id" class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                     @foreach($shelves as $shelf)
                                         <option value="{{ $shelf->id }}">{{ $shelf->nama_rak }} - {{ $shelf->lokasi }}</option>
                                     @endforeach
                                 </select>
                             </div>
-
                         </div>
 
-                        <div class="mt-6 flex justify-end gap-2">
-                            <a href="{{ route('books.index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                        {{-- Update Bagian Tombol --}}
+                        <div class="mt-8 flex justify-end gap-3">
+                            {{-- 1. Tombol Batal --}}
+                            <a href="{{ route('books.index') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded transition">
                                 Batal
                             </a>
-                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+
+                            {{-- 2. Tombol Simpan & Lanjut --}}
+                            <button type="submit" name="action" value="save_and_create" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition">
+                                Simpan & Tambah Lagi
+                            </button>
+
+                            {{-- 3. Tombol Simpan (Default) --}}
+                            <button type="submit" name="action" value="save" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition">
                                 Simpan Buku
                             </button>
                         </div>

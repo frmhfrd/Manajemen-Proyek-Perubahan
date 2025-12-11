@@ -21,9 +21,12 @@
 
                         {{-- Nama Kategori --}}
                         <div class="mb-4">
-                            <label for="nama" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nama Kategori</label>
-                            <input type="text" name="nama" id="nama" value="{{ old('nama', $category->name) }}" class="w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-700 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm" required>
-                            @error('nama')
+                            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nama Kategori</label>
+
+                            {{-- PERHATIKAN PERUBAHAN DI BAWAH INI --}}
+                            <input type="text" name="name" id="name" value="{{ old('name', $category->name) }}" class="w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-700 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm" required>
+
+                            @error('name')
                                 <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>

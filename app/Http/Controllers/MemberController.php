@@ -31,21 +31,34 @@ class MemberController extends Controller
 
     public function store(Request $request)
     {
+        // 1. Validasi
         $validated = $request->validate([
             'kode_anggota' => 'required|unique:members,kode_anggota|max:20',
             'nama_lengkap' => 'required|string|max:100',
             'tipe_anggota' => 'required|in:siswa,guru,staf',
-            'kelas'        => 'nullable|string|max:10', // Boleh kosong kalau Guru
+            'kelas'        => 'nullable|string|max:10',
             'no_telepon'   => 'nullable|string|max:15',
             'alamat'       => 'nullable|string',
         ]);
 
-        // Set default aktif
+        // 2. Set Default Aktif
         $validated['status_aktif'] = true;
 
-        Member::create($validated);
+        // 3. Simpan ke Database
+        \App\Models\Member::create($validated);
 
-        return redirect()->route('members.index')->with('success', 'Anggota berhasil didaftarkan!');
+        // --- BAGIAN INI YANG DIPERBAIKI ---
+
+        // 4. Cek Tombol Mana yang Ditekan
+        if ($request->input('action') == 'save_and_create') {
+            // Jika klik tombol "Simpan & Tambah Lagi" -> Balik ke Form Create
+            return redirect()->route('members.create')
+                ->with('success', 'Anggota berhasil didaftarkan! Silakan daftar lagi.');
+        }
+
+        // 5. Default (Jika klik tombol "Simpan" biasa) -> Balik ke Index/Tabel
+        return redirect()->route('members.index')
+            ->with('success', 'Anggota berhasil didaftarkan.');
     }
 
     public function edit(string $id)

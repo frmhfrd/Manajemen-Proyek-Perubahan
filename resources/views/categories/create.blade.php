@@ -12,6 +12,15 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+
+            {{-- Alert Sukses (Muncul saat 'Simpan & Tambah Lagi') --}}
+            @if(session('success'))
+                <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                    <strong class="font-bold">Berhasil!</strong>
+                    <span class="block sm:inline">{{ session('success') }}</span>
+                </div>
+            @endif
+
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
 
@@ -20,17 +29,28 @@
 
                         {{-- Nama Kategori --}}
                         <div class="mb-4">
-                            <label for="nama" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nama Kategori</label>
-                            <input type="text" name="nama" id="nama" class="w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-700 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm" placeholder="Contoh: Fiksi, Sains, Sejarah..." required>
-                            @error('nama')
+                            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nama Kategori</label>
+                            <input type="text" name="name" id="name" class="w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-700 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm" placeholder="Contoh: Fiksi, Sains, Sejarah..." required>
+                            @error('name')
                                 <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>
 
-                        {{-- Tombol Aksi --}}
-                        <div class="flex justify-end gap-2 mt-6">
-                            <a href="{{ route('categories.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm">Batal</a>
-                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-bold">Simpan</button>
+                        {{-- Tombol Aksi (3 Opsi) --}}
+                        <div class="flex justify-end gap-3 mt-6">
+                            <a href="{{ route('categories.index') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded transition">
+                                Batal
+                            </a>
+
+                            {{-- Tombol Hijau: Simpan & Tambah Lagi --}}
+                            <button type="submit" name="action" value="save_and_create" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition">
+                                Simpan & Tambah Lagi
+                            </button>
+
+                            {{-- Tombol Biru: Simpan --}}
+                            <button type="submit" name="action" value="save" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition">
+                                Simpan
+                            </button>
                         </div>
                     </form>
 

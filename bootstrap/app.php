@@ -3,8 +3,8 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\KioskGuard;
+use App\Http\Middleware\RoleMiddleware; // <--- PERBAIKAN: Gunakan RoleMiddleware, bukan CheckRole
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,17 +14,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
 
-        // DAFTARKAN ALIAS DI SINI:
-        $middleware->alias([
-            'role' => CheckRole::class,
-        ]);
-
+        // 1. Pengecualian CSRF (Untuk Midtrans nanti)
         $middleware->validateCsrfTokens(except: [
-            'midtrans-callback', // Ini nama route URL-nya nanti
+            'midtrans-callback',
         ]);
 
+        // 2. Daftar Alias Middleware (Digabung jadi satu biar rapi)
         $middleware->alias([
             'kiosk.guard' => KioskGuard::class,
+            'role'        => RoleMiddleware::class, // <--- Pastikan ini merujuk ke RoleMiddleware
         ]);
 
     })

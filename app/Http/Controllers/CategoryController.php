@@ -9,7 +9,7 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        $categories = Category::withCount('books')->latest()->paginate(10); // withCount untuk lihat ada berapa buku di kategori ini
+        $categories = Category::withCount('books')->latest()->paginate(10);
         return view('categories.index', compact('categories'));
     }
 
@@ -20,12 +20,23 @@ class CategoryController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
-            'nama' => 'required|string|max:50|unique:categories,nama'
+        // 1. Validasi
+        $validated = $request->validate([
+            'name' => 'required|string|max:50|unique:categories,name'
         ]);
 
-        Category::create($request->all());
-        return redirect()->route('categories.index')->with('success', 'Kategori baru berhasil ditambahkan.');
+        // 2. Simpan Data
+        \App\Models\Category::create($validated);
+
+        // 3. Cek Tombol Mana yang Ditekan
+        if ($request->input('action') == 'save_and_create') {
+            return redirect()->route('categories.create')
+                ->with('success', 'Kategori "' . $request->name . '" berhasil ditambahkan. Silakan tambah lagi.');
+        }
+
+        // 4. Default Redirect (Ke Index)
+        return redirect()->route('categories.index')
+            ->with('success', 'Kategori baru berhasil ditambahkan.');
     }
 
     public function edit(Category $category)
@@ -36,7 +47,7 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category)
     {
         $request->validate([
-            'nama' => 'required|string|max:50|unique:categories,nama,'.$category->id
+            'name' => 'required|string|max:50|unique:categories,name,'.$category->id
         ]);
 
         $category->update($request->all());

@@ -20,13 +20,24 @@ class ShelfController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        // 1. Validasi
+        $validated = $request->validate([
             'nama_rak' => 'required|string|max:50',
             'lokasi'   => 'required|string|max:100',
         ]);
 
-        Shelf::create($request->all());
-        return redirect()->route('shelves.index')->with('success', 'Rak baru berhasil dibuat.');
+        // 2. Simpan Data
+        \App\Models\Shelf::create($validated);
+
+        // 3. Cek Tombol Mana yang Ditekan
+        if ($request->input('action') == 'save_and_create') {
+            return redirect()->route('shelves.create')
+                ->with('success', 'Rak "' . $request->nama_rak . '" berhasil disimpan. Silakan tambah lagi.');
+        }
+
+        // 4. Default Redirect
+        return redirect()->route('shelves.index')
+            ->with('success', 'Rak baru berhasil ditambahkan.');
     }
 
     public function edit(Shelf $shelf)

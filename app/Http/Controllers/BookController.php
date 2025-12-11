@@ -45,29 +45,35 @@ class BookController extends Controller
 
     public function store(Request $request)
     {
-        // 1. Validasi Input (Security Guard)
+        // 1. Validasi Input
         $validated = $request->validate([
-            'kode_buku'    => 'required|unique:books,kode_buku|max:50',
-            'judul'        => 'required|string|max:255',
-            'pengarang'    => 'required|string|max:100',
-            'penerbit'     => 'nullable|string|max:100',
-            'tahun_terbit' => 'nullable|integer|min:1900|max:'.(date('Y')+1),
-            'kategori_id'  => 'required|exists:categories,id',
-            'rak_id'       => 'required|exists:shelves,id',
+            'kode_buku'    => 'required|unique:books,kode_buku',
+            'judul'        => 'required',
+            'pengarang'    => 'required',
+            'penerbit'     => 'nullable',
+            'tahun_terbit' => 'nullable|integer',
             'stok_total'   => 'required|integer|min:1',
+            'kategori_id'  => 'nullable|exists:categories,id',
+            'rak_id'       => 'nullable|exists:shelves,id',
         ]);
 
-        // 2. Logika Stok Awal
-        // Saat buku baru masuk, stok tersedia = stok total. Rusak/Hilang = 0.
+        // 2. Simpan Data (Otomatis isi stok_tersedia sama dengan stok_total)
         $validated['stok_tersedia'] = $validated['stok_total'];
-        $validated['stok_rusak']    = 0;
-        $validated['stok_hilang']   = 0;
 
-        // 3. Simpan ke Database
-        Book::create($validated);
+        \App\Models\Book::create($validated);
 
-        // 4. Kembali ke halaman list dengan pesan sukses
-        return redirect()->route('books.index')->with('success', 'Buku berhasil ditambahkan!');
+        // --- 3. LOGIKA TOMBOL (INI YANG KURANG KEMARIN) ---
+
+        // Cek apakah tombol "Simpan & Tambah Lagi" yang ditekan?
+        if ($request->input('action') == 'save_and_create') {
+            // Redirect KEMBALI ke halaman create (Form kosong lagi) + Pesan Sukses
+            return redirect()->route('books.create')
+                ->with('success', 'Buku "' . $request->judul . '" berhasil disimpan. Silakan input buku selanjutnya.');
+        }
+
+        // Jika tombol "Simpan Buku" biasa (Default)
+        return redirect()->route('books.index')
+            ->with('success', 'Buku berhasil ditambahkan.');
     }
 
     // Tampilkan Form Edit
