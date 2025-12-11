@@ -4,7 +4,7 @@
             <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 {{ __('Buat Peminjaman Baru') }}
             </h2>
-            <a href="{{ route('loans.index') }}" class="text-gray-400 hover:text-gray-200 font-bold">
+            <a href="{{ route('loans.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition">
                 &larr; Kembali
             </a>
         </div>

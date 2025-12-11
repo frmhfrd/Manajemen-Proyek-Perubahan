@@ -47,6 +47,9 @@
                                 <x-dropdown-link :href="route('shelves.index')">
                                     {{ __('Rak Penyimpanan') }}
                                 </x-dropdown-link>
+                                <x-dropdown-link :href="route('stock-opnames.index')">
+                                    {{ __('Inventarisasi Stok') }}
+                                </x-dropdown-link>
                             </x-slot>
                         </x-dropdown>
                     </div>

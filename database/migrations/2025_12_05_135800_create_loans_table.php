@@ -23,7 +23,7 @@ return new class extends Migration
             $table->date('tgl_wajib_kembali');
             $table->date('tgl_kembali')->nullable();
 
-            $table->string('tahun_ajaran', 10); // ex: 2024/2025
+            $table->string('tahun_ajaran', 10);
             $table->enum('status_transaksi', ['berjalan', 'selesai', 'terlambat'])->default('berjalan');
             $table->decimal('total_denda', 10, 2)->default(0);
 

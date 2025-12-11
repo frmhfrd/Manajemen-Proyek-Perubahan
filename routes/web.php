@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PublicController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BookController;
@@ -12,8 +13,31 @@ use App\Http\Controllers\SettingController;
 use App\Http\Controllers\PaymentCallbackController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
+
+// ==============================================================================
+// GROUP 0: PUBLIC (Akses Umum / Homepage)
+// ==============================================================================
+Route::get('/', [PublicController::class, 'index'])->name('home');
+Route::get('/buku/{id}', [PublicController::class, 'showBook'])->name('public.book.show');
+
+// ==============================================================================
+// GROUP KIOSK (DILINDUNGI IP ADDRESS) 🔒
+// ==============================================================================
+Route::middleware(['kiosk.guard'])->group(function () {
+
+    // Fitur Pinjam Mandiri
+    Route::get('/pinjam-mandiri/{id}', [PublicController::class, 'kiosk'])->name('public.kiosk');
+    Route::post('/pinjam-mandiri-proses', [PublicController::class, 'processSelfLoan'])->name('public.kiosk.process');
+
+    // Anjungan Mandiri (Scan to Borrow)
+    Route::get('/anjungan-mandiri', [PublicController::class, 'standbyKiosk'])->name('public.kiosk-standby');
+    Route::post('/check-book', [PublicController::class, 'checkBook'])->name('public.check-book');
+
+    // Pengembalian Mandiri
+    Route::get('/kembali-mandiri', [PublicController::class, 'returnKiosk'])->name('public.kiosk-return');
+    Route::post('/cek-pinjaman-member', [PublicController::class, 'checkMemberLoans'])->name('public.check-member-loans');
+    Route::post('/proses-kembali-mandiri', [PublicController::class, 'processSelfReturn'])->name('public.process-return');
+
 });
 
 // ==============================================================================
@@ -44,14 +68,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('members', MemberController::class);
 
 
-    // --- MODUL PEMINJAMAN ---
-    Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
-    Route::get('/loans/create', [LoanController::class, 'create'])->name('loans.create');
-    Route::post('/loans', [LoanController::class, 'store'])->name('loans.store');
-    Route::get('/loans/refresh-all', [LoanController::class, 'refreshAllStatus'])->name('loans.refresh_all');
-    Route::get('/loans', [LoanController::class, 'index'])->name('loans.index');
-    Route::put('/loans/{id}/return', [LoanController::class, 'returnLoan'])->name('loans.return');
-    Route::put('/loans/{id}/check-status', [LoanController::class, 'checkPaymentStatus'])->name('loans.check_status');
+    // --- MANAJEMEN PEMINJAMAN (LOANS) ---
+    Route::get('/loans', [App\Http\Controllers\LoanController::class, 'index'])->name('loans.index');
+    Route::get('/loans/create', [App\Http\Controllers\LoanController::class, 'create'])->name('loans.create');
+    Route::post('/loans', [App\Http\Controllers\LoanController::class, 'store'])->name('loans.store');
+
+    // Refresh Status Midtrans (Massal)
+    Route::get('/loans/refresh-all', [App\Http\Controllers\LoanController::class, 'refreshAllStatus'])->name('loans.refresh_all');
+
+    // Cek Status Midtrans (Per Item)
+    Route::put('/loans/{id}/check-status', [App\Http\Controllers\LoanController::class, 'checkPaymentStatus'])->name('loans.check_status');
+
+    // Pengembalian Buku
+    Route::put('/loans/{id}/return', [App\Http\Controllers\LoanController::class, 'returnLoan'])->name('loans.return');
+
+    // Bayar Denda Susulan (Tunai)
+    Route::put('/loans/{id}/pay-fine', [App\Http\Controllers\LoanController::class, 'payLateFine'])->name('loans.pay-late-fine');
 
 
     // --- MODUL MASTER DATA (Kategori & Rak) ---

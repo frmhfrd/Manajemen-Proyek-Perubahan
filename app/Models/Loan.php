@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Loan extends Model
 {
     use HasFactory;
-    protected $guarded = ['id'];
+    protected $guarded = [];
 
     // Agar kolom tanggal otomatis jadi objek Carbon (mudah diformat tgl)
     protected $casts = [

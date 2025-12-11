@@ -58,3 +58,16 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
 # Manajemen-Proyek-Perubahan
+
+
+URL Admin: .../login
+
+Akun Admin: admin@sekolah.sch.id / password
+
+URL Kiosk Pinjam: .../anjungan-mandiri
+
+URL Kiosk Kembali: .../kembali-mandiri
+
+Contoh Kartu Anggota: 2024001 (Pastikan member ini ada di DB).
+
+Contoh Buku: Print 1 QR Code buku untuk demo scan.

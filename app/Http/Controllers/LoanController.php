@@ -63,6 +63,7 @@ class LoanController extends Controller
                     'tgl_wajib_kembali' => Carbon::now()->addDays((int)$durasiPinjam),
                     'tahun_ajaran' => '2024/2025',
                     'status_transaksi' => 'berjalan',
+                    'tahun_ajaran' => (date('m') > 6) ? date('Y').'/'.(date('Y')+1) : (date('Y')-1).'/'.date('Y'),
                 ]);
 
                 // 2. Loop Buku
@@ -94,35 +95,58 @@ class LoanController extends Controller
         // 1. Ambil Data Transaksi
         $loan = Loan::with('details')->findOrFail($id);
 
-        // SATPAM: Jika status sudah selesai, tolak proses!
+        // Pencegahan: Jangan proses jika sudah selesai
         if ($loan->status_transaksi == 'selesai') {
-            return back()->with('error', 'Transaksi ini sudah diselesaikan sebelumnya!');
+            return back()->with('error', 'Transaksi ini sudah selesai sebelumnya!');
         }
 
         try {
-            DB::transaction(function () use ($loan) {
+            DB::transaction(function () use ($loan, $request) {
 
-                // 2. Logic Hitung Denda & Telat
+                // 2. Setup Variabel Perhitungan
                 $dendaPerHari = (int) (Setting::where('key', 'denda_harian')->value('value') ?? 500);
 
-                $tanggalKembali = Carbon::now()->startOfDay();
-                $jatuhTempo     = $loan->tgl_wajib_kembali->startOfDay();
+                // Gunakan startOfDay() agar jam/menit tidak mempengaruhi (hanya tanggal)
+                $tglKembali = Carbon::now()->startOfDay();
+                $jatuhTempo = Carbon::parse($loan->tgl_wajib_kembali)->startOfDay();
 
+                // Update tanggal kembali real di database (pake jam sekarang)
                 $loan->tgl_kembali = Carbon::now();
-                $loan->total_denda = 0;
 
-                // Cek Telat
-                if ($tanggalKembali->gt($jatuhTempo)) {
-                    $selisihHari = $tanggalKembali->diffInDays($jatuhTempo);
-                    $loan->total_denda = $selisihHari * $dendaPerHari;
+                // 3. LOGIKA HITUNG DENDA (JURUS ANTI MINUS)
+                // Hitung selisih: Dari Jatuh Tempo -> Ke Tanggal Kembali
+                // Parameter 'false' agar menghasilkan nilai positif/negatif
+                $selisihHari = $jatuhTempo->diffInDays($tglKembali, false);
+
+                // Fungsi max(0, $var) akan membuang nilai negatif.
+                // Jika selisih -5 (Cepat), diambil 0. Jika selisih 5 (Telat), diambil 5.
+                $hariTelat = max(0, $selisihHari);
+
+                // Hitung Total Nominal
+                $loan->total_denda = $hariTelat * $dendaPerHari;
+
+                // 4. LOGIKA STATUS PEMBAYARAN
+                if ($loan->total_denda == 0) {
+                    // Skenario A: Tepat Waktu / Lebih Cepat
+                    $loan->status_pembayaran = 'paid'; // Otomatis Lunas
+                } else {
+                    // Skenario B: Terlambat (Punya Denda)
+                    // Defaultnya Pending (Menunggu Bayar)
+                    $loan->status_pembayaran = 'pending';
+
+                    // Cek Checkbox "Bayar Tunai" dari Admin
+                    // Jika dicentang, langsung ubah jadi Paid & Tunai
+                    if ($request->has('denda_lunas')) {
+                        $loan->status_pembayaran = 'paid';
+                        $loan->tipe_pembayaran   = 'tunai';
+                    }
                 }
 
-                // 3. Status AKHIR harus selalu 'selesai'
+                // 5. Simpan Perubahan Header
                 $loan->status_transaksi = 'selesai';
-
                 $loan->save();
 
-                // 4. Balikin Stok Buku
+                // 6. Kembalikan Stok Buku (Looping Detail)
                 foreach ($loan->details as $detail) {
                     if ($detail->status_item !== 'kembali') {
                         $detail->update(['status_item' => 'kembali']);
@@ -134,7 +158,7 @@ class LoanController extends Controller
             return back()->with('success', 'Buku berhasil dikembalikan & Stok diperbarui.');
 
         } catch (\Exception $e) {
-            return back()->with('error', 'Gagal: ' . $e->getMessage());
+            return back()->with('error', 'Gagal memproses pengembalian: ' . $e->getMessage());
         }
     }
 
@@ -233,5 +257,21 @@ class LoanController extends Controller
             // Jika 0, beri pesan Info agar user tidak bingung
             return back()->with('info', 'Pengecekan selesai. Belum ada pembayaran baru yang masuk (Status masih Pending di Midtrans).');
         }
+    }
+
+    public function payLateFine($id)
+    {
+        $loan = Loan::findOrFail($id);
+
+        // Pastikan memang sudah selesai tapi belum bayar
+        if ($loan->status_transaksi == 'selesai' && $loan->status_pembayaran != 'paid') {
+            $loan->update([
+                'status_pembayaran' => 'paid',
+                'tipe_pembayaran'   => 'tunai' // Admin terima cash
+            ]);
+            return back()->with('success', 'Pembayaran denda tunai berhasil dicatat.');
+        }
+
+        return back()->with('error', 'Transaksi tidak valid untuk pembayaran susulan.');
     }
 }
