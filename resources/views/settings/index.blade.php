@@ -26,7 +26,7 @@
                         @csrf
                         @method('PUT')
 
-                        <div class="grid grid-cols-1 gap-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                             {{-- Card 1: Aturan Denda --}}
                             <div class="p-4 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
@@ -53,6 +53,22 @@
                                         <span class="px-3 py-2 bg-gray-200 border border-l-0 border-gray-300 rounded-r-md text-gray-600">Hari</span>
                                     </div>
                                     <p class="text-xs text-gray-500">Default tanggal jatuh tempo saat transaksi baru.</p>
+                                </div>
+                            </div>
+
+                            {{-- Card 3: Kuota Buku (BARU) --}}
+                            <div class="p-4 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600 md:col-span-2">
+                                <h3 class="font-bold text-lg mb-2 text-green-600">Kuota Peminjaman</h3>
+                                <div class="flex flex-col gap-2">
+                                    <label class="font-medium text-sm">Maksimal Buku Dipinjam per Siswa</label>
+                                    <div class="flex items-center">
+                                        <input type="number" name="max_buku_pinjam" value="{{ $settings['max_buku_pinjam'] ?? 3 }}"
+                                            class="w-full border-gray-300 dark:bg-gray-900 rounded-l-md focus:ring-indigo-500">
+                                        <span class="px-3 py-2 bg-gray-200 border border-l-0 border-gray-300 rounded-r-md text-gray-600">Buku</span>
+                                    </div>
+                                    <p class="text-xs text-gray-500">
+                                        Jika siswa sudah meminjam jumlah ini, sistem akan menolak peminjaman baru sampai buku sebelumnya dikembalikan.
+                                    </p>
                                 </div>
                             </div>
 

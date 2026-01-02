@@ -29,11 +29,22 @@
 
             {{-- KOLOM KIRI: COVER JUMBO --}}
             <div class="md:w-1/3 bg-gray-100 flex items-center justify-center p-10 relative overflow-hidden">
-                <div class="absolute inset-0 bg-indigo-50 opacity-50 pattern-dots"></div> {{-- Pattern Background --}}
-                <div class="w-64 h-80 bg-white shadow-2xl rotate-3 transform transition hover:rotate-0 duration-500 flex items-center justify-center border-2 border-gray-200 rounded-3xl z-10">
-                    <div class="text-center">
-                        <span class="block text-8xl text-indigo-200 font-bold mb-2">{{ substr($book->judul, 0, 1) }}</span>
-                    </div>
+                <div class="absolute inset-0 bg-indigo-50 opacity-50 pattern-dots"></div>
+
+                <div class="w-128 h-auto min-h-[320px] bg-white shadow-2xl rotate-3 transform transition hover:rotate-0 duration-500 flex items-center justify-center border-4 border-white rounded-xl z-10 overflow-hidden">
+                    @if($book->cover_image)
+                        <img src="{{ asset('storage/' . $book->cover_image) }}"
+                            alt="{{ $book->judul }}"
+                            class="w-full h-full object-cover">
+                    @else
+                        {{-- Fallback Text --}}
+                        <div class="text-center p-10">
+                            <span class="block text-8xl text-indigo-200 font-bold mb-2">
+                                {{ substr($book->judul, 0, 1) }}
+                            </span>
+                            <span class="text-gray-400 text-sm">Tidak ada sampul</span>
+                        </div>
+                    @endif
                 </div>
             </div>
 

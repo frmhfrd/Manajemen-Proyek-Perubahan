@@ -13,10 +13,14 @@ return new class extends Migration
     {
         Schema::create('stock_opnames', function (Blueprint $table) {
             $table->id();
-            $table->string('kode_opname')->unique(); // Contoh: SO-20251210
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained();
+            $table->integer('stok_sistem');
+            $table->integer('stok_fisik_bagus');
+            $table->integer('stok_fisik_rusak');
+            $table->integer('selisih_hilang');
             $table->date('tgl_opname');
-            $table->foreignId('user_id')->constrained('users'); // Siapa yang ngecek
-            $table->text('catatan')->nullable();
+            $table->text('keterangan')->nullable();
             $table->timestamps();
         });
     }

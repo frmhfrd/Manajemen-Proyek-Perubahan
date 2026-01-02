@@ -6,9 +6,10 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\MemberController;
-use App\Http\Controllers\ReportController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ShelfController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\StockOpnameController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\PaymentCallbackController;
 use Illuminate\Support\Facades\Route;
@@ -91,11 +92,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('shelves', ShelfController::class);
 
 
-    // --- MODUL LAPORAN ---
-    Route::get('/reports/print', [ReportController::class, 'print'])->name('reports.print');
+    // --- MODUL LAPORAN PEMINJAMAN ---
+    Route::get('/reports/loans', [ReportController::class, 'loanIndex'])->name('reports.loans.index');
+    Route::get('/reports/loans/print', [ReportController::class, 'loanPrint'])->name('reports.loans.print');
 
-    // MODUL STOCK OPNAME
-    Route::resource('stock-opnames', \App\Http\Controllers\StockOpnameController::class);
+    // --- MODUL LAPORAN DENDA ---
+    Route::get('/fines', [ReportController::class, 'finesIndex'])->name('reports.fines.index');
+    Route::get('/fines/print', [ReportController::class, 'finesPrint'])->name('reports.fines.print');
+
+    // --- MODUL STOCK OPNAME ---
+    Route::resource('stock-opnames', StockOpnameController::class);
+    Route::get('/stock-opnames/{id}/export-pdf', [StockOpnameController::class, 'exportPdf'])->name('stock-opnames.export-pdf');
 
 
     // ==============================================================================

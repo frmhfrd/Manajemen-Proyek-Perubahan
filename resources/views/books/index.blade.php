@@ -99,17 +99,24 @@
                                     {{-- Kolom Info Buku --}}
                                     <td class="px-6 py-4">
                                         <div class="flex items-center">
-                                            {{-- Ikon Buku (Hiasan) --}}
-                                            <div class="flex-shrink-0 h-10 w-10 bg-indigo-100 text-indigo-500 rounded-full flex items-center justify-center mr-3 font-bold">
-                                                {{ strtoupper(substr($book->judul ?? 'B', 0, 1)) }}
+                                            {{-- LOGIKA TAMPILAN GAMBAR --}}
+                                            <div class="flex-shrink-0 h-14 w-10 mr-3">
+                                                @if($book->cover_image)
+                                                    <img class="h-14 w-10 object-cover rounded shadow cursor-pointer hover:scale-150 transition transform origin-left"
+                                                        src="{{ asset('storage/' . $book->cover_image) }}"
+                                                        alt="{{ $book->judul }}">
+                                                @else
+                                                    {{-- Placeholder jika tidak ada gambar --}}
+                                                    <div class="h-14 w-10 bg-indigo-100 text-indigo-500 rounded flex items-center justify-center font-bold text-xs border border-indigo-200">
+                                                        {{ strtoupper(substr($book->judul, 0, 1)) }}
+                                                    </div>
+                                                @endif
                                             </div>
+
                                             <div>
                                                 <div class="text-base font-semibold text-gray-900 dark:text-white">{{ $book->judul }}</div>
                                                 <div class="text-xs text-gray-500 font-mono">ISBN: {{ $book->kode_buku }}</div>
-                                                <div class="text-xs text-gray-500">{{ $book->pengarang }}</div>
-                                                <span class="mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                                    {{ $book->category->nama }}
-                                                </span>
+                                                <div class="text-xs font-bold text-green-600 mt-1">Rp {{ number_format($book->harga, 0, ',', '.') }}</div>
                                             </div>
                                         </div>
                                     </td>
@@ -140,14 +147,14 @@
                                     {{-- Kolom Aksi --}}
                                     <td class="px-6 py-4 text-center">
                                         <div class="flex justify-center space-x-2">
-                                            <a href="{{ route('books.edit', $book->id) }}" class="text-white bg-yellow-400 hover:bg-yellow-500 focus:ring-4 focus:outline-none focus:ring-yellow-300 font-medium rounded-lg text-xs px-3 py-1.5 text-center dark:focus:ring-yellow-900 transition">
+                                            <a href="{{ route('books.edit', $book->id) }}" class="text-white bg-yellow-400 hover:bg-yellow-500 focus:ring-4 focus:outline-none focus:ring-yellow-300 font-medium rounded-lg px-3 py-1.5 text-center dark:focus:ring-yellow-900 transition">
                                                 Edit
                                             </a>
 
                                             {{-- Tombol Hapus dengan Trigger Modal --}}
                                             <button type="button"
                                                 onclick="openDeleteModal('{{ route('books.destroy', $book->id) }}', '{{ $book->judul }}')"
-                                                class="text-white bg-red-600 hover:bg-red-700 focus:ring-4 focus:outline-none focus:ring-red-300 font-medium rounded-lg text-xs px-3 py-1.5 text-center transition">
+                                                class="text-white bg-red-600 hover:bg-red-700 focus:ring-4 focus:outline-none focus:ring-red-300 font-medium rounded-lg px-3 py-1.5 text-center transition">
                                                 Hapus
                                             </button>
                                         </div>

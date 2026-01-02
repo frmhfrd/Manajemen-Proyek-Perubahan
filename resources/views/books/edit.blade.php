@@ -17,9 +17,9 @@
 
                     {{-- Form EDIT --}}
                     {{-- Perubahan 1: Route mengarah ke UPDATE dengan ID --}}
-                    <form action="{{ route('books.update', $book->id) }}" method="POST">
+                    <form action="{{ route('books.update', $book->id) }}" method="POST" enctype="multipart/form-data">
                         @csrf
-                        @method('PUT') {{-- Perubahan 2: Method Spoofing untuk Update --}}
+                        @method('PUT')
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -53,6 +53,18 @@
                                     class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             </div>
 
+                            {{-- Input Harga Edit --}}
+                            <div>
+                                <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Harga Buku (Rp)</label>
+                                <div class="relative mt-1 rounded-md shadow-sm">
+                                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                        <span class="text-gray-500 sm:text-sm">Rp</span>
+                                    </div>
+                                    <input type="number" name="harga" value="{{ old('harga', $book->harga) }}" min="0"
+                                        class="block w-full rounded-md border-gray-300 pl-10 focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-900 dark:border-gray-600 sm:text-sm" required>
+                                </div>
+                            </div>
+
                             {{-- Tahun Terbit --}}
                             <div>
                                 <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Tahun Terbit</label>
@@ -66,6 +78,21 @@
                                 <input type="number" name="stok_total" value="{{ old('stok_total', $book->stok_total) }}" min="1"
                                     class="mt-1 block w-full rounded-md border-gray-300 dark:bg-gray-900 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
                                 <p class="text-xs text-gray-500 mt-1">Mengubah stok total akan otomatis menyesuaikan stok tersedia.</p>
+                            </div>
+
+                            <div>
+                                <label class="block font-medium text-sm text-gray-700 dark:text-gray-300">Foto Sampul Buku</label>
+
+                                {{-- Pratinjau Gambar Lama --}}
+                                @if($book->cover_image)
+                                    <div class="mb-2">
+                                        <img src="{{ asset('storage/' . $book->cover_image) }}" alt="Cover Buku" class="h-32 w-24 object-cover rounded shadow">
+                                    </div>
+                                @endif
+
+                                <input type="file" name="cover_image" accept="image/*"
+                                    class="mt-1 block w-full ... (style sama seperti create) ...">
+                                <p class="text-xs text-gray-500 mt-1">Biarkan kosong jika tidak ingin mengubah gambar.</p>
                             </div>
 
                             {{-- Kategori (Dropdown) --}}

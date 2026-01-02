@@ -116,7 +116,16 @@
                 @foreach($books as $book)
                 <a href="{{ route('public.book.show', $book->id) }}" class="group bg-white rounded-2xl md:rounded-3xl shadow-lg border-2 border-transparent hover:border-indigo-400 overflow-hidden transition-all duration-300 hover:shadow-2xl btn-press flex flex-col h-full">
                     <div class="h-40 md:h-64 bg-gray-100 relative flex items-center justify-center overflow-hidden">
-                        <div class="text-6xl md:text-8xl text-gray-300 font-bold select-none group-hover:scale-110 transition duration-500">{{ substr($book->judul, 0, 1) }}</div>
+                        @if($book->cover_image)
+                            <img src="{{ asset('storage/' . $book->cover_image) }}"
+                                alt="{{ $book->judul }}"
+                                class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                        @else
+                            {{-- Fallback jika tidak ada gambar --}}
+                            <div class="text-6xl md:text-8xl text-gray-300 font-bold select-none group-hover:scale-110 transition duration-500">
+                                {{ substr($book->judul, 0, 1) }}
+                            </div>
+                        @endif
                         <div class="absolute top-2 right-2 md:top-3 md:right-3 bg-black/70 text-white px-2 py-1 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold backdrop-blur">Rak {{ $book->shelf->nama_rak ?? '?' }}</div>
                     </div>
 

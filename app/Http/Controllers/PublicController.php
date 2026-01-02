@@ -87,7 +87,7 @@ class PublicController extends Controller
                 throw new \Exception('Kartu Anggota Tidak Aktif / Diblokir.');
             }
 
-            // --- [LOGIKA BARU: BLACKLIST CEK] ---
+            // --- [LOGIKA BLACKLIST CEK] ---
 
             // A. Cek Buku Telat (Fisik belum balik & Tanggal lewat)
             $bukuTelat = Loan::where('member_id', $member->id)
@@ -99,29 +99,33 @@ class PublicController extends Controller
                 throw new \Exception('DITOLAK: Anda masih meminjam buku yang sudah lewat jatuh tempo. Harap kembalikan dulu!');
             }
 
-            // B. Cek Denda Belum Lunas (Ada tagihan Midtrans status unpaid/pending)
+            // B. Cek Denda Belum Lunas
             $dendaNunggak = Loan::where('member_id', $member->id)
                                 ->whereIn('status_pembayaran', ['unpaid', 'pending'])
-                                ->where('total_denda', '>', 0) // <--- INI KUNCINYA
+                                ->where('total_denda', '>', 0)
                                 ->exists();
 
             if ($dendaNunggak) {
-                // Ambil info denda biar pesan errornya jelas
                 $totalHutang = Loan::where('member_id', $member->id)
                                    ->whereIn('status_pembayaran', ['unpaid', 'pending'])
                                    ->sum('total_denda');
-
-                throw new \Exception('DITOLAK: Anda memiliki tunggakan denda sebesar Rp ' . number_format($totalHutang) . '. Harap lunasi di meja admin atau via online sebelum meminjam lagi.');
+                throw new \Exception('DITOLAK: Ada tunggakan denda Rp ' . number_format($totalHutang) . '. Lunasi dulu ya!');
             }
 
-            // C. Cek Batas Maksimal Pinjam (Misal max 3 buku)
-            $jumlahPinjam = Loan::where('member_id', $member->id)
-                                ->where('status_transaksi', 'berjalan')
-                                ->count();
+            // C. Cek Batas Maksimal Pinjam
+            $maxPinjam = Setting::where('key', 'max_buku_pinjam')->value('value') ?? 3;
 
-            // Angka 3 bisa diambil dari tabel settings jika mau dinamis
-            if ($jumlahPinjam >= 3) {
-                throw new \Exception('DITOLAK: Anda sudah meminjam 3 buku (Batas Maksimal). Kembalikan satu untuk meminjam lagi.');
+            // Hitung jumlah BUKU FISIK yang sedang dipinjam (bukan jumlah transaksi)
+            $jumlahBukuSedangDipinjam = LoanDetail::whereHas('loan', function($q) use ($member) {
+                                            $q->where('member_id', $member->id)
+                                              ->where('status_transaksi', 'berjalan');
+                                        })
+                                        ->where('status_item', 'dipinjam')
+                                        ->count();
+
+            // Jika buku yang dibawa sudah sama dengan atau lebih dari batas, TOLAK.
+            if ($jumlahBukuSedangDipinjam >= $maxPinjam) {
+                throw new \Exception("DITOLAK: Kuota Penuh! Anda sedang meminjam {$jumlahBukuSedangDipinjam} buku. Batas maksimal adalah {$maxPinjam} buku.");
             }
 
             // -------------------------------------
@@ -133,21 +137,18 @@ class PublicController extends Controller
             }
 
             // 4. Cari Petugas Default
-            $petugas = User::find(3);
-            if (!$petugas) {
-                throw new \Exception('Error Sistem: Tidak ada data petugas.');
-            }
+            $petugas = User::first(); // Ambil user pertama sebagai default system handler
+            if (!$petugas) $petugasId = 1; else $petugasId = $petugas->id;
 
-            DB::transaction(function () use ($request, $member, $petugas) {
+            DB::transaction(function () use ($request, $member, $petugasId) {
                 // Buat Loan
                 $loan = Loan::create([
                     'kode_transaksi' => 'SELF-' . time(),
                     'member_id'      => $member->id,
-                    'user_id'        => $petugas->id,
+                    'user_id'        => $petugasId,
                     'tgl_pinjam'     => Carbon::now(),
                     'tgl_wajib_kembali' => Carbon::now()->addDays((int)$request->durasi),
                     'status_transaksi' => 'berjalan',
-                    // Gunakan guarded di Model, jadi aman tanpa fillable
                     'tahun_ajaran'   => (date('m') > 6) ? date('Y').'/'.(date('Y')+1) : (date('Y')-1).'/'.date('Y'),
                 ]);
 
@@ -168,8 +169,8 @@ class PublicController extends Controller
             Log::error("Kiosk Error: " . $e->getMessage());
             return response()->json([
                 'status' => 'error',
-                'message' => $e->getMessage() // Pesan error blacklist akan muncul di sini
-            ], 500); // Gunakan 500 atau 400
+                'message' => $e->getMessage()
+            ], 400);
         }
     }
 
@@ -182,12 +183,9 @@ class PublicController extends Controller
     // Cek Buku via Scan
     public function checkBook(Request $request)
     {
-        // Cari buku berdasarkan ID (QR Code buku isinya ID Buku)
-        // Atau bisa berdasarkan kode_buku jika QR isinya kode unik
         $book = Book::with(['category', 'shelf'])->find($request->book_code);
 
         if (!$book) {
-            // Coba cari by kode_buku (kalau QR isinya ISBN/Kode)
             $book = Book::with(['category', 'shelf'])->where('kode_buku', $request->book_code)->first();
         }
 
@@ -205,9 +203,15 @@ class PublicController extends Controller
     // --- FITUR PENGEMBALIAN MANDIRI (KIOSK RETURN) ---
 
     // 1. Halaman Kiosk Pengembalian
+    // 1. Halaman Kiosk Pengembalian
     public function returnKiosk()
     {
-        return view('public.kiosk-return');
+        // AMBIL SETTING DARI DATABASE
+        // Jika tidak ada di db, baru default ke 500
+        $dendaPerHari = \App\Models\Setting::where('key', 'denda_harian')->value('value') ?? 500;
+
+        // Kirim variabel $dendaPerHari ke View
+        return view('public.kiosk-return', compact('dendaPerHari'));
     }
 
     // 2. API: Cek Member & Buku yang sedang dipinjam
@@ -219,7 +223,8 @@ class PublicController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Kartu Anggota Tidak Dikenali.']);
         }
 
-        // Ambil transaksi yang BELUM kembali (status: berjalan / terlambat)
+        // Ambil transaksi yang BELUM kembali
+        // Penting: Load 'details.book' agar harga buku terbawa ke frontend
         $activeLoans = Loan::with(['details.book'])
                             ->where('member_id', $member->id)
                             ->whereIn('status_transaksi', ['berjalan', 'terlambat'])
@@ -236,69 +241,88 @@ class PublicController extends Controller
         ]);
     }
 
-    // 3. API: Proses Pengembalian (Update: Hitung Denda & Kirim WA)
+    // 3. API: Proses Pengembalian (Update: Hitung Denda Waktu & Ganti Rugi)
     public function processSelfReturn(Request $request)
     {
-        // 1. Validasi Member
-        $member = Member::find($request->member_id);
-
-        if (!$member) {
-            return response()->json(['status' => 'error', 'message' => 'Data Member tidak valid.']);
-        }
-
-        // 2. Ambil Setting Denda
-        $dendaPerHari = (int) (\App\Models\Setting::where('key', 'denda_harian')->value('value') ?? 500);
+        // Request menerima: member_id, items (Array of {loan_id, detail_id, status})
+        $items = $request->items;
+        $totalTagihan = 0;
 
         try {
-            DB::transaction(function () use ($request, $dendaPerHari) {
-                foreach ($request->loan_ids as $loanId) {
-                    $loan = Loan::with('details')->find($loanId);
+            DB::transaction(function () use ($items, &$totalTagihan) {
 
-                    if ($loan && $loan->status_transaksi != 'selesai') {
+                $dendaPerHari = (int) (Setting::where('key', 'denda_harian')->value('value') ?? 500);
+                $today = Carbon::now()->startOfDay();
 
-                        // --- [LOGIKA BARU: JURUS ANTI MINUS] ---
-                        // Gunakan startOfDay agar jam tidak mempengaruhi selisih
-                        $tglKembali = Carbon::now()->startOfDay();
-                        $jatuhTempo = Carbon::parse($loan->tgl_wajib_kembali)->startOfDay();
+                // Grouping items by Loan ID agar hitungan denda waktu (header) tidak dobel
+                $groupedItems = collect($items)->groupBy('loan_id');
 
-                        // Update tanggal real ke database
-                        $loan->tgl_kembali = Carbon::now();
+                foreach ($groupedItems as $loanId => $details) {
+                    $loan = Loan::with('details.book')->find($loanId);
 
-                        // Hitung Selisih: Dari Jatuh Tempo -> Ke Tgl Kembali
-                        // false = agar bisa return nilai negatif (jika cepat) atau positif (jika telat)
-                        $selisihHari = $jatuhTempo->diffInDays($tglKembali, false);
+                    if (!$loan || $loan->status_transaksi == 'selesai') continue;
 
-                        // Ambil nilai terbesar antara 0 dan selisih
-                        // Jika selisih -5 (Cepat), diambil 0.
-                        // Jika selisih 2 (Telat), diambil 2.
-                        $hariTelat = max(0, $selisihHari);
+                    // A. Hitung Denda Waktu (Per Transaksi)
+                    $jatuhTempo = Carbon::parse($loan->tgl_wajib_kembali)->startOfDay();
+                    $selisihHari = $jatuhTempo->diffInDays($today, false);
+                    $telatHari = max(0, $selisihHari);
+                    $dendaWaktu = $telatHari * $dendaPerHari;
 
-                        // Hitung Nominal Denda
-                        $denda = $hariTelat * $dendaPerHari;
+                    // Update Header Loan
+                    $loan->tgl_kembali = now();
+                    $loan->status_transaksi = 'selesai';
 
-                        // Tentukan Status Bayar
-                        // Jika denda > 0 -> Pending (Utang). Jika 0 -> Paid (Lunas).
-                        $statusBayar = ($denda > 0) ? 'pending' : 'paid';
+                    // B. Proses Detail Buku (Stok & Ganti Rugi)
+                    $dendaGantiRugi = 0;
 
-                        // ----------------------------------------
+                    foreach ($details as $item) {
+                        // Cari detail spesifik
+                        $dbDetail = $loan->details->where('id', $item['detail_id'])->first();
+                        if (!$dbDetail) continue;
 
-                        // Update Loan Header
-                        $loan->update([
-                            'status_transaksi'  => 'selesai',
-                            'total_denda'       => $denda,       // Pasti 0 atau Positif
-                            'status_pembayaran' => $statusBayar
+                        $kondisi = $item['status']; // 'kembali' atau 'hilang'
+
+                        // Update Loan Detail
+                        $dbDetail->update([
+                            'status_item' => $kondisi, // update status item jadi 'hilang' atau 'kembali'
+                            'kondisi_kembali' => ($kondisi == 'hilang') ? 'hilang' : 'baik'
                         ]);
 
-                        // Kembalikan Stok Buku
-                        foreach ($loan->details as $detail) {
-                            $detail->update(['status_item' => 'kembali']);
-                            Book::where('id', $detail->book_id)->increment('stok_tersedia');
+                        // LOGIKA STOK & HARGA
+                        if ($kondisi == 'hilang') {
+                            // Stok Hilang +1
+                            Book::where('id', $dbDetail->book_id)->increment('stok_hilang');
+                            // Tambah Denda Harga Buku
+                            $hargaBuku = $dbDetail->book->harga ?? 0;
+                            $dendaGantiRugi += $hargaBuku;
+                        } else {
+                            // Buku Kembali (Normal) -> Stok Tersedia +1
+                            Book::where('id', $dbDetail->book_id)->increment('stok_tersedia');
                         }
                     }
+
+                    // C. Simpan Total Denda ke Database
+                    $loan->total_denda = $dendaWaktu + $dendaGantiRugi;
+                    $totalTagihan += $loan->total_denda;
+
+                    // Tentukan Status Bayar
+                    if ($loan->total_denda > 0) {
+                        $loan->status_pembayaran = 'pending'; // Harus bayar ke admin (pending/unpaid)
+                    } else {
+                        $loan->status_pembayaran = 'paid';
+                    }
+
+                    $loan->save();
                 }
             });
 
-            return response()->json(['status' => 'success', 'message' => 'Buku berhasil dikembalikan. Silakan cek status denda Anda.']);
+            // Susun Pesan Respon
+            $msg = 'Pengembalian Berhasil!';
+            if ($totalTagihan > 0) {
+                $msg .= ' Ada tagihan denda (Keterlambatan/Ganti Rugi) sebesar Rp ' . number_format($totalTagihan, 0, ',', '.') . '. Harap lunasi di meja admin.';
+            }
+
+            return response()->json(['status' => 'success', 'message' => $msg]);
 
         } catch (\Exception $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()]);

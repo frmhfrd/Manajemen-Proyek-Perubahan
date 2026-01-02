@@ -4,7 +4,7 @@
             <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 {{ __('Buat Peminjaman Baru') }}
             </h2>
-            <a href="{{ route('loans.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition text-sm">
+            <a href="{{ route('loans.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition">
                 &larr; Kembali
             </a>
         </div>
@@ -72,7 +72,7 @@
                         </div>
 
                         {{-- Tombol Submit --}}
-                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition transform hover:-translate-y-1 flex items-center justify-center gap-2 text-lg">
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition transform hover:-translate-y-1 flex items-center justify-center gap-2">
                             <span>✅</span> PROSES PEMINJAMAN
                         </button>
                     </div>
@@ -161,8 +161,8 @@
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #15803d; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #59a574; }
     </style>
 
     <script>

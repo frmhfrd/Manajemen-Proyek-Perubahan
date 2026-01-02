@@ -6,7 +6,22 @@
             </h2>
 
             <div class="flex gap-2">
-                {{-- Tombol Tambah (Biru) --}}
+                {{-- Tombol Laporan Statistik --}}
+                <a href="{{ route('reports.loans.index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2">
+                    {{-- Icon Chart/Grafik --}}
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    Laporan & Statistik
+                </a>
+                {{-- Tombol Laporan Denda --}}
+                <a href="{{ route('reports.fines.index') }}" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition flex items-center gap-2">
+                    {{-- Icon Denda --}}
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                    Laporan Denda
+                </a>
+
+                {{-- Tombol Tambah (Biru) - Sudah Ada --}}
                 <a href="{{ route('loans.create') }}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition">
                     + Transaksi Baru
                 </a>
@@ -29,12 +44,12 @@
             @endif
 
             {{-- Alert Error --}}
-            {{-- @if(session('error'))
+            @if(session('error'))
                 <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow-sm">
                     <p class="font-bold">Gagal</p>
                     <p>{{ session('error') }}</p>
                 </div>
-            @endif --}}
+            @endif
 
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
@@ -53,6 +68,7 @@
                                 {{-- Tombol Scan --}}
                                 <button type="button" onclick="startSearchScanner()" class="bg-yellow-500 text-white w-10 h-10 rounded-md hover:bg-yellow-600 shadow-sm transition flex items-center justify-center flex-shrink-0" title="Scan Kartu/Barcode">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+
                                 </button>
 
                                 <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-700 h-10">Cari</button>
@@ -156,8 +172,20 @@
                                         {{-- KONDISI 1: PROSES PENGEMBALIAN (Tombol Biru) --}}
                                         @if($loan->status_transaksi != 'selesai')
                                             <button type="button"
-                                                onclick="openReturnModal('{{ route('loans.return', $loan->id) }}', '{{ $loan->kode_transaksi }}', '{{ $loan->member->nama_lengkap }}', '{{ $loan->tgl_wajib_kembali->format('Y-m-d') }}', '{{ $loan->status_pembayaran }}')"
-                                                class="group relative inline-flex items-center justify-center p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all duration-200 hover:scale-105 active:scale-95"
+                                                onclick="openReturnModal(
+                                                    '{{ route('loans.return', $loan->id) }}',
+                                                    '{{ $loan->kode_transaksi }}',
+                                                    '{{ $loan->member->nama_lengkap }}',
+                                                    '{{ $loan->tgl_wajib_kembali->format('Y-m-d') }}',
+                                                    '{{ $loan->status_pembayaran }}',
+                                                    {{-- PERHATIKAN BARIS DI BAWAH INI --}}
+                                                    {{ json_encode($loan->details->map(fn($d) => [
+                                                        'id' => $d->id,
+                                                        'judul' => $d->book->judul,
+                                                        'harga' => $d->book->harga ?? 0 // <--- Kirim harga buku (default 0 jika null)
+                                                    ])) }}
+                                                )"
+                                                class="group relative inline-flex items-center justify-center p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all duration-200"
                                                 title="Proses Pengembalian">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
                                             </button>
@@ -230,10 +258,18 @@
                             </div>
                             <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                                 <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Proses Pengembalian</h3>
-                                <div class="mt-2 text-sm text-gray-500 dark:text-gray-300">
-                                    <p>Kode: <span id="modalKode" class="font-bold"></span></p>
-                                    <p>Peminjam: <span id="modalNama" class="font-bold"></span></p>
-                                </div>
+                                    <div class="mt-2 text-sm text-gray-500 dark:text-gray-300 mb-4">
+                                        <p>Kode: <span id="modalKode" class="font-bold"></span></p>
+                                        <p>Peminjam: <span id="modalNama" class="font-bold"></span></p>
+                                    </div>
+
+                                    {{-- AREA INPUT KONDISI BUKU --}}
+                                    <div class="mb-4">
+                                        <p class="text-xs font-bold text-gray-700 uppercase mb-2">Cek Kondisi Buku:</p>
+                                        <div id="bookListContainer" class="space-y-2 max-h-40 overflow-y-auto bg-gray-50 p-2 rounded border">
+                                            {{-- Javascript akan menyuntikkan daftar buku di sini --}}
+                                        </div>
+                                    </div>
 
                                 {{-- Area Denda --}}
                                 <div id="dendaArea" class="hidden mt-4 bg-red-50 border border-red-200 rounded p-3">
@@ -445,52 +481,109 @@
         }
 
         // --- RETURN MODAL LOGIC ---
-        function openReturnModal(url, kode, nama, tglTempo, statusBayar) {
+        function openReturnModal(url, kode, nama, tglTempo, statusBayar, books) {
             document.getElementById('returnForm').action = url;
             document.getElementById('modalKode').innerText = kode;
             document.getElementById('modalNama').innerText = nama;
 
+            // 1. HITUNG DENDA TELAT (WAKTU)
+            // const tarifDenda diambil dari variabel global PHP di atas script ini
             const today = new Date(); today.setHours(0,0,0,0);
             const tempo = new Date(tglTempo); tempo.setHours(0,0,0,0);
             const diffTime = today - tempo;
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+            let dendaTelat = 0;
+            if (diffDays > 0) {
+                dendaTelat = diffDays * tarifDenda;
+                document.getElementById('telatHari').innerText = diffDays;
+            } else {
+                document.getElementById('telatHari').innerText = 0;
+            }
+
+            // 2. RENDER DAFTAR BUKU + LOGIKA DENDA GANTI RUGI
+            const container = document.getElementById('bookListContainer');
+            container.innerHTML = '';
+
+            if (books && books.length > 0) {
+                books.forEach((book, index) => {
+                    // Format harga ke Rupiah biar Admin tau harga bukunya
+                    let hargaFormatted = new Intl.NumberFormat('id-ID').format(book.harga);
+
+                    const html = `
+                        <div class="flex items-center justify-between text-sm border-b pb-1 last:border-0 mb-2">
+                            <div class="flex flex-col w-1/2">
+                                <span class="font-medium text-gray-700 truncate">${index+1}. ${book.judul}</span>
+                                <span class="text-[10px] text-gray-400">Harga: Rp ${hargaFormatted}</span>
+                            </div>
+
+                            <select name="kondisi[${book.id}]"
+                                    class="kondisi-input text-xs border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                                    onchange="hitungTotalDenda(${dendaTelat})"
+                                    data-harga="${book.harga}">
+                                <option value="baik">✅ Baik</option>
+                                <option value="rusak">⚠️ Rusak</option>
+                                <option value="hilang">❌ Hilang (Denda)</option>
+                            </select>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', html);
+                });
+            } else {
+                container.innerHTML = '<span class="text-xs text-red-500">Gagal memuat daftar buku.</span>';
+            }
+
+            // Panggil hitungan pertama kali
+            hitungTotalDenda(dendaTelat, statusBayar);
+
+            document.getElementById('returnModal').classList.remove('hidden');
+        }
+
+        // --- FUNGSI BARU: HITUNG TOTAL GABUNGAN (TELAT + HILANG) ---
+        function hitungTotalDenda(dendaTelat, statusBayar = null) {
+            let dendaGantiRugi = 0;
+
+            // Loop semua dropdown kondisi
+            document.querySelectorAll('.kondisi-input').forEach(select => {
+                if (select.value === 'hilang') {
+                    // Ambil harga dari atribut data-harga
+                    dendaGantiRugi += parseFloat(select.getAttribute('data-harga') || 0);
+                }
+            });
+
+            // Total Akhir
+            let grandTotal = dendaTelat + dendaGantiRugi;
+
+            // Tampilkan ke UI
             const dendaArea = document.getElementById('dendaArea');
             const infoNormal = document.getElementById('infoNormal');
+            const labelNominal = document.getElementById('nominalDenda');
             const checkbox = document.getElementById('konfirmasiBayar');
+            const labelBayar = document.getElementById('labelBayar');
 
-            // Reset Default: Hapus centang & HAPUS REQUIRED (Biar opsional)
-            checkbox.checked = false;
-            checkbox.removeAttribute('required'); // <--- INI KUNCINYA
-            checkbox.disabled = false;
-            document.getElementById('labelBayar').innerText = "Bayar tunai sekarang (Centang jika lunas)";
+            labelNominal.innerText = new Intl.NumberFormat('id-ID').format(grandTotal);
 
-            if (diffDays > 0) {
-                // KENA DENDA
-                const totalDenda = diffDays * tarifDenda;
+            // Logika Tampil/Sembunyi Kotak Merah
+            if (grandTotal > 0) {
                 dendaArea.classList.remove('hidden');
                 infoNormal.classList.add('hidden');
-                document.getElementById('telatHari').innerText = diffDays;
-                document.getElementById('nominalDenda').innerText = new Intl.NumberFormat('id-ID').format(totalDenda);
 
-                // Logika Status Pembayaran
-                if (statusBayar === 'paid') {
-                    // Jika sudah bayar via Online sebelumnya
+                // Reset Checkbox state
+                if (statusBayar === 'paid' && grandTotal === dendaTelat) {
+                    // Kalau sudah lunas (dan tidak ada tambahan denda hilang), kunci checkbox
                     checkbox.checked = true;
                     checkbox.disabled = true;
-                    document.getElementById('labelBayar').innerHTML = "<span class='text-green-600 font-bold'>SUDAH LUNAS VIA MIDTRANS ✅</span>";
+                    labelBayar.innerHTML = "<span class='text-green-600 font-bold'>SUDAH LUNAS ✅</span>";
                 } else {
-                    // Jika belum bayar:
-                    // JANGAN DI-REQUIRED. Biarkan admin memilih mau centang (bayar) atau tidak (utang).
-                    checkbox.removeAttribute('required');
+                    // Kalau ada tambahan denda baru (Ganti Rugi), buka checkbox biar bisa bayar lagi
+                    checkbox.disabled = false;
+                    checkbox.checked = false;
+                    labelBayar.innerText = "Bayar tunai sekarang (Centang jika lunas)";
                 }
-
             } else {
-                // TEPAT WAKTU
                 dendaArea.classList.add('hidden');
                 infoNormal.classList.remove('hidden');
             }
-            document.getElementById('returnModal').classList.remove('hidden');
         }
 
         // --- FUNGSI BARU: PAY MODAL ---
