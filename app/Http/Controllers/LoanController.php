@@ -34,8 +34,9 @@ class LoanController extends Controller
 
         $loans = $query->orderBy('id', 'desc')->paginate(10);
         $dendaPerHari = Setting::where('key', 'denda_harian')->value('value') ?? 500;
+        $dendaRusak   = Setting::where('key', 'denda_rusak')->value('value') ?? 10000;
 
-        return view('loans.index', compact('loans', 'dendaPerHari'));
+        return view('loans.index', compact('loans', 'dendaPerHari', 'dendaRusak'));
     }
 
     public function create()
@@ -178,16 +179,20 @@ class LoanController extends Controller
             return back()->with('error', 'Transaksi ini sudah selesai sebelumnya!');
         }
 
-        // Validasi Input Kondisi
         $request->validate([
             'kondisi' => 'required|array',
-            'kondisi.*' => 'in:baik,rusak,hilang', // Pastikan valuenya valid
+            // Pastikan validasi menerima 'rusak'
+            'kondisi.*' => 'in:baik,rusak,hilang',
         ]);
 
         try {
             DB::transaction(function () use ($loan, $request) {
-                // 1. Hitung Denda Keterlambatan (Waktu)
+                // 1. Denda Waktu
                 $dendaPerHari = (int) (Setting::where('key', 'denda_harian')->value('value') ?? 500);
+
+                // PERBAIKAN: Ambil Denda Rusak
+                $nominalRusak = (int) (Setting::where('key', 'denda_rusak')->value('value') ?? 10000);
+
                 $tglKembali = Carbon::now()->startOfDay();
                 $jatuhTempo = Carbon::parse($loan->tgl_wajib_kembali)->startOfDay();
                 $loan->tgl_kembali = Carbon::now();
@@ -195,44 +200,35 @@ class LoanController extends Controller
                 $selisihHari = max(0, $jatuhTempo->diffInDays($tglKembali, false));
                 $dendaTelat = $selisihHari * $dendaPerHari;
 
-                // Variabel untuk menampung total harga buku yang hilang
                 $dendaGantiRugi = 0;
-
-                // 2. PROSES DETAIL BUKU
                 $inputs = $request->input('kondisi');
 
                 foreach ($loan->details as $detail) {
                     $kondisi = $inputs[$detail->id] ?? 'baik';
 
-                    // Update Status
                     $detail->update([
                         'status_item' => $kondisi == 'hilang' ? 'hilang' : 'kembali',
                         'kondisi_kembali' => $kondisi
                     ]);
 
-                    // Update Stok & Hitung Ganti Rugi
                     if ($kondisi == 'hilang') {
-                        // A. Stok Hilang bertambah
                         Book::where('id', $detail->book_id)->increment('stok_hilang');
-
-                        // B. TAMBAHKAN HARGA BUKU KE DENDA
-                        // Pastikan harga diambil, jika 0 atau null pake 0
                         $hargaBuku = $detail->book->harga ?? 0;
                         $dendaGantiRugi += $hargaBuku;
 
                     } elseif ($kondisi == 'rusak') {
+                        // PERBAIKAN: Implementasi Logika Rusak
                         Book::where('id', $detail->book_id)->increment('stok_rusak');
-                        // Opsional: Jika rusak mau didenda juga (misal 50% harga), tambahkan logic disini
+                        $dendaGantiRugi += $nominalRusak; // Tambah denda 10rb (atau sesuai setting)
+
                     } else {
                         Book::where('id', $detail->book_id)->increment('stok_tersedia');
                     }
                 }
 
-                // 3. SIMPAN HEADER TRANSAKSI
-                // Total Denda = Denda Telat (Waktu) + Denda Ganti Rugi (Barang)
+                // ... (Sisa kode penyimpanan total_denda tetap sama) ...
                 $loan->total_denda = $dendaTelat + $dendaGantiRugi;
 
-                // Logic Status Pembayaran (Tetap Sama)
                 if ($loan->total_denda == 0) {
                     $loan->status_pembayaran = 'paid';
                 } else {

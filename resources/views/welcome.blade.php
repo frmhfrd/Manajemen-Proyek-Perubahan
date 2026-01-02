@@ -5,23 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Perpus Ceria - SDN 6 Singaparna</title>
 
-    {{-- 1. HAPUS @VITE, GANTI DENGAN CDN ONLINE --}}
+    {{-- CDN --}}
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
-    {{-- Tambahkan Font Comic Neue agar mirip desain asli --}}
     <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
-        /* Konfigurasi Font Custom via CSS */
         body { font-family: 'Comic Neue', sans-serif; }
-
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .btn-press:active { transform: scale(0.95); }
+
+        /* Animasi Modal */
+        @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .animate-pop-in { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+        #search-reader video { object-fit: cover; width: 100% !important; height: 100% !important; border-radius: 1.5rem; }
     </style>
 </head>
-<body class="bg-blue-50 text-gray-800 antialiased min-h-screen flex flex-col">
+<body class="bg-indigo-50 text-gray-800 antialiased min-h-screen flex flex-col">
 
     {{-- NAVBAR --}}
     <nav class="bg-white shadow-lg sticky top-0 z-50 py-3 md:py-4">
@@ -36,11 +38,11 @@
                 {{-- SEARCH BAR --}}
                 <form action="{{ route('home') }}" class="flex-1 flex gap-2">
                     <div class="relative flex-1">
-                        <input type="text" name="q" value="{{ request('q') }}" placeholder="Cari..."
+                        <input type="text" name="q" value="{{ request('q') }}" placeholder="Cari judul buku..."
                             class="w-full h-12 md:h-14 pl-4 md:pl-6 pr-14 md:pr-16 rounded-2xl border-2 border-indigo-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200 text-lg md:text-xl font-bold shadow-inner placeholder-gray-400">
 
                         <button type="button" onclick="openSearchScanner()" class="absolute right-1 top-1 bottom-1 md:right-2 md:top-2 md:bottom-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 rounded-xl px-3 flex items-center justify-center transition btn-press border-b-4 border-yellow-600" title="Scan Buku">
-                            <svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                            <svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
                         </button>
                     </div>
 
@@ -62,19 +64,22 @@
         {{-- 1. MENU AKSES CEPAT (Responsive Grid) --}}
         @if(!request('q') && !request('cat'))
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-            <a href="{{ route('public.kiosk-standby') }}" class="group relative bg-white overflow-hidden rounded-3xl shadow-xl border-b-8 border-purple-200 btn-press p-6 flex flex-row sm:flex-col items-center justify-center text-center hover:bg-purple-50 transition gap-4 sm:gap-0">
-                <div class="w-16 h-16 md:w-24 md:h-24 bg-purple-100 rounded-full flex items-center justify-center md:mb-4 text-4xl md:text-6xl group-hover:scale-110 transition">📖</div>
+
+            {{-- Tombol Pinjam (INDIGO) --}}
+            <a href="{{ route('public.kiosk-standby') }}" class="group relative bg-white overflow-hidden rounded-[2rem] shadow-xl border-b-8 border-indigo-200 btn-press p-6 flex flex-row sm:flex-col items-center justify-center text-center hover:bg-indigo-50 transition gap-4 sm:gap-0">
+                <div class="w-16 h-16 md:w-24 md:h-24 bg-indigo-100 rounded-full flex items-center justify-center md:mb-4 text-4xl md:text-6xl group-hover:scale-110 transition shadow-inner">📖</div>
                 <div class="text-left sm:text-center">
-                    <h2 class="text-2xl md:text-3xl font-extrabold text-purple-700">Pinjam Buku</h2>
-                    <p class="text-gray-500 text-sm md:text-lg">Ambil buku, lalu scan.</p>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-indigo-700">Pinjam Buku</h2>
+                    <p class="text-gray-500 text-sm md:text-lg">Ambil buku, lalu scan di sini.</p>
                 </div>
             </a>
 
-            <a href="{{ route('public.kiosk-return') }}" class="group relative bg-white overflow-hidden rounded-3xl shadow-xl border-b-8 border-green-200 btn-press p-6 flex flex-row sm:flex-col items-center justify-center text-center hover:bg-green-50 transition gap-4 sm:gap-0">
-                <div class="w-16 h-16 md:w-24 md:h-24 bg-green-100 rounded-full flex items-center justify-center md:mb-4 text-4xl md:text-6xl group-hover:scale-110 transition">🔄</div>
+            {{-- Tombol Kembali (HIJAU) --}}
+            <a href="{{ route('public.kiosk-return') }}" class="group relative bg-white overflow-hidden rounded-[2rem] shadow-xl border-b-8 border-green-200 btn-press p-6 flex flex-row sm:flex-col items-center justify-center text-center hover:bg-green-50 transition gap-4 sm:gap-0">
+                <div class="w-16 h-16 md:w-24 md:h-24 bg-green-100 rounded-full flex items-center justify-center md:mb-4 text-4xl md:text-6xl group-hover:scale-110 transition shadow-inner">🔄</div>
                 <div class="text-left sm:text-center">
                     <h2 class="text-2xl md:text-3xl font-extrabold text-green-700">Kembalikan</h2>
-                    <p class="text-gray-500 text-sm md:text-lg">Sudah selesai baca?</p>
+                    <p class="text-gray-500 text-sm md:text-lg">Sudah selesai baca? Balikin yuk.</p>
                 </div>
             </a>
         </div>
@@ -121,7 +126,7 @@
                                 alt="{{ $book->judul }}"
                                 class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
                         @else
-                            {{-- Fallback jika tidak ada gambar --}}
+                            {{-- Fallback --}}
                             <div class="text-6xl md:text-8xl text-gray-300 font-bold select-none group-hover:scale-110 transition duration-500">
                                 {{ substr($book->judul, 0, 1) }}
                             </div>
@@ -137,7 +142,7 @@
                         <div class="flex items-center justify-between mt-auto">
                             @if($book->stok_tersedia > 0)
                                 <div class="bg-green-100 text-green-700 px-2 py-1 md:px-3 rounded-lg text-xs md:text-sm font-bold">Ada {{ $book->stok_tersedia }}</div>
-                                <span class="w-8 h-8 md:w-10 md:h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg text-sm md:text-base">➜</span>
+                                <span class="w-8 h-8 md:w-10 md:h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg text-sm md:text-base transition transform group-hover:rotate-12">➜</span>
                             @else
                                 <div class="bg-red-100 text-red-700 px-2 py-1 rounded-lg text-xs font-bold w-full text-center">Habis</div>
                             @endif
@@ -148,10 +153,10 @@
             </div>
             <div class="mt-8">{{ $books->withQueryString()->links() }}</div>
             @else
-            <div class="text-center py-10 md:py-20">
+            <div class="text-center py-10 md:py-20 bg-white rounded-3xl border-4 border-indigo-50">
                 <div class="text-4xl md:text-6xl mb-4">🙈</div>
-                <h3 class="text-xl md:text-2xl font-bold text-gray-600">Buku tidak ditemukan</h3>
-                <a href="/" class="inline-block mt-6 bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg btn-press">Reset</a>
+                <h3 class="text-xl md:text-2xl font-bold text-gray-600">Yah, bukunya gak ketemu...</h3>
+                <a href="/" class="inline-block mt-6 bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg btn-press">Coba Reset</a>
             </div>
             @endif
         </div>
@@ -168,20 +173,39 @@
         </div>
     </footer>
 
-    {{-- MODAL SCANNER --}}
+    {{-- MODAL SCANNER PENCARIAN --}}
     <div id="searchScannerModal" class="hidden fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl w-full max-w-lg overflow-hidden relative shadow-2xl">
-            <button onclick="closeSearchScanner()" class="absolute top-4 right-4 bg-red-100 text-red-600 w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-bold text-xl z-10 btn-press">X</button>
-            <div id="search-reader" class="w-full h-64 md:h-80 bg-black"></div>
-            <div class="p-6 md:p-8 text-center bg-indigo-50">
-                <h3 class="text-xl md:text-2xl font-bold text-indigo-900 mb-2">Scan Barcode Buku</h3>
-                <p class="text-indigo-600 text-sm md:text-base">Arahkan kamera ke kode di belakang buku.</p>
+        <div class="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden relative shadow-2xl animate-pop-in">
+            <div class="bg-gray-100 p-4 flex justify-between items-center border-b">
+                <h3 class="font-bold text-xl text-gray-800 pl-2">🔍 Scan Buku</h3>
+                <button onclick="closeSearchScanner()" class="bg-red-100 text-red-600 w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl btn-press">&times;</button>
             </div>
+
+            <div class="p-6">
+                <div class="relative w-full h-64 md:h-80 bg-black rounded-3xl overflow-hidden border-4 border-indigo-100 shadow-inner">
+                    <div id="search-reader" class="w-full h-full object-cover"></div>
+                    <div class="absolute inset-0 border-4 border-indigo-500/30 rounded-3xl pointer-events-none"></div>
+                </div>
+                <div class="mt-6 text-center">
+                    <p class="text-indigo-600 font-medium">Arahkan kamera ke barcode buku.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 🛑 MODAL ERROR (BARU: PENGGANTI ALERT) --}}
+    <div id="errorModal" class="hidden fixed inset-0 bg-black/90 z-[90] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-[2.5rem] w-full max-w-sm p-6 text-center shadow-2xl animate-pop-in relative">
+            <div class="text-6xl mb-4">🙈</div>
+            <h3 class="text-xl font-bold text-gray-800 mb-2">Tidak Ditemukan</h3>
+            <p class="text-gray-500 mb-6">Maaf, buku dengan kode tersebut tidak ada di data kami.</p>
+            <button onclick="closeErrorModal()" class="w-full bg-indigo-100 text-indigo-700 font-bold py-3 rounded-xl hover:bg-indigo-200 transition">Tutup</button>
         </div>
     </div>
 
     <script>
         let searchHtml5Qrcode = null;
+
         function openSearchScanner() {
             document.getElementById('searchScannerModal').classList.remove('hidden');
             searchHtml5Qrcode = new Html5Qrcode("search-reader");
@@ -191,18 +215,37 @@
                 }
             });
         }
+
         function closeSearchScanner() {
             if(searchHtml5Qrcode) {
-                searchHtml5Qrcode.stop().then(() => { document.getElementById('searchScannerModal').classList.add('hidden'); }).catch(err => { document.getElementById('searchScannerModal').classList.add('hidden'); });
-            } else { document.getElementById('searchScannerModal').classList.add('hidden'); }
+                searchHtml5Qrcode.stop().then(() => {
+                    document.getElementById('searchScannerModal').classList.add('hidden');
+                }).catch(err => {
+                    document.getElementById('searchScannerModal').classList.add('hidden');
+                });
+            } else {
+                document.getElementById('searchScannerModal').classList.add('hidden');
+            }
         }
+
         function checkBookAndRedirect(code) {
             fetch('{{ route("public.check-book") }}', {
                 method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ book_code: code })
             }).then(res => res.json()).then(data => {
-                if(data.status === 'success') { window.location.href = "/buku/" + data.data.id; } else { alert('Buku tidak ditemukan!'); }
+                if(data.status === 'success') {
+                    // Redirect jika sukses
+                    window.location.href = "/buku/" + data.data.id;
+                } else {
+                    // Tampilkan Modal Error (Bukan Alert)
+                    document.getElementById('errorModal').classList.remove('hidden');
+                }
                 closeSearchScanner();
             });
+        }
+
+        // Fungsi Tutup Modal Error
+        function closeErrorModal() {
+            document.getElementById('errorModal').classList.add('hidden');
         }
     </script>
 </body>

@@ -115,7 +115,7 @@ class PublicController extends Controller
             // C. Cek Batas Maksimal Pinjam
             $maxPinjam = Setting::where('key', 'max_buku_pinjam')->value('value') ?? 3;
 
-            // Hitung jumlah BUKU FISIK yang sedang dipinjam (bukan jumlah transaksi)
+            // Hitung jumlah BUKU FISIK yang sedang dipinjam
             $jumlahBukuSedangDipinjam = LoanDetail::whereHas('loan', function($q) use ($member) {
                                             $q->where('member_id', $member->id)
                                               ->where('status_transaksi', 'berjalan');
@@ -203,15 +203,14 @@ class PublicController extends Controller
     // --- FITUR PENGEMBALIAN MANDIRI (KIOSK RETURN) ---
 
     // 1. Halaman Kiosk Pengembalian
-    // 1. Halaman Kiosk Pengembalian
     public function returnKiosk()
     {
         // AMBIL SETTING DARI DATABASE
-        // Jika tidak ada di db, baru default ke 500
         $dendaPerHari = \App\Models\Setting::where('key', 'denda_harian')->value('value') ?? 500;
+        $dendaRusak   = \App\Models\Setting::where('key', 'denda_rusak')->value('value') ?? 10000;
 
-        // Kirim variabel $dendaPerHari ke View
-        return view('public.kiosk-return', compact('dendaPerHari'));
+        // [PERBAIKAN] Penulisan compact yang benar: dipisah koma & tanpa dollar di string
+        return view('public.kiosk-return', compact('dendaPerHari', 'dendaRusak'));
     }
 
     // 2. API: Cek Member & Buku yang sedang dipinjam
@@ -224,7 +223,6 @@ class PublicController extends Controller
         }
 
         // Ambil transaksi yang BELUM kembali
-        // Penting: Load 'details.book' agar harga buku terbawa ke frontend
         $activeLoans = Loan::with(['details.book'])
                             ->where('member_id', $member->id)
                             ->whereIn('status_transaksi', ['berjalan', 'terlambat'])
@@ -244,7 +242,6 @@ class PublicController extends Controller
     // 3. API: Proses Pengembalian (Update: Hitung Denda Waktu & Ganti Rugi)
     public function processSelfReturn(Request $request)
     {
-        // Request menerima: member_id, items (Array of {loan_id, detail_id, status})
         $items = $request->items;
         $totalTagihan = 0;
 
@@ -252,9 +249,10 @@ class PublicController extends Controller
             DB::transaction(function () use ($items, &$totalTagihan) {
 
                 $dendaPerHari = (int) (Setting::where('key', 'denda_harian')->value('value') ?? 500);
-                $today = Carbon::now()->startOfDay();
+                // Optimasi: Ambil denda rusak di luar loop
+                $nominalRusak = (int) (Setting::where('key', 'denda_rusak')->value('value') ?? 10000);
 
-                // Grouping items by Loan ID agar hitungan denda waktu (header) tidak dobel
+                $today = Carbon::now()->startOfDay();
                 $groupedItems = collect($items)->groupBy('loan_id');
 
                 foreach ($groupedItems as $loanId => $details) {
@@ -276,16 +274,17 @@ class PublicController extends Controller
                     $dendaGantiRugi = 0;
 
                     foreach ($details as $item) {
-                        // Cari detail spesifik
                         $dbDetail = $loan->details->where('id', $item['detail_id'])->first();
                         if (!$dbDetail) continue;
 
-                        $kondisi = $item['status']; // 'kembali' atau 'hilang'
+                        $kondisi = $item['status']; // 'kembali', 'rusak', atau 'hilang'
 
-                        // Update Loan Detail
+                        // [PERBAIKAN] Logika Status yang Benar
+                        // Jika rusak/hilang, status_item tetap dianggap 'kembali' (fisik ada) atau 'hilang' (tidak ada)
+                        // Tapi kondisi_kembali mencatat kondisi fisiknya.
                         $dbDetail->update([
-                            'status_item' => $kondisi, // update status item jadi 'hilang' atau 'kembali'
-                            'kondisi_kembali' => ($kondisi == 'hilang') ? 'hilang' : 'baik'
+                            'status_item' => ($kondisi == 'hilang') ? 'hilang' : 'kembali',
+                            'kondisi_kembali' => $kondisi // Simpan: 'baik', 'rusak', atau 'hilang'
                         ]);
 
                         // LOGIKA STOK & HARGA
@@ -295,6 +294,14 @@ class PublicController extends Controller
                             // Tambah Denda Harga Buku
                             $hargaBuku = $dbDetail->book->harga ?? 0;
                             $dendaGantiRugi += $hargaBuku;
+
+                        } elseif ($kondisi == 'rusak') {
+                            // [PERBAIKAN] Tambah ke Stok Rusak
+                            Book::where('id', $dbDetail->book_id)->increment('stok_rusak');
+
+                            // Tambah Denda Rusak
+                            $dendaGantiRugi += $nominalRusak;
+
                         } else {
                             // Buku Kembali (Normal) -> Stok Tersedia +1
                             Book::where('id', $dbDetail->book_id)->increment('stok_tersedia');
@@ -319,7 +326,7 @@ class PublicController extends Controller
             // Susun Pesan Respon
             $msg = 'Pengembalian Berhasil!';
             if ($totalTagihan > 0) {
-                $msg .= ' Ada tagihan denda (Keterlambatan/Ganti Rugi) sebesar Rp ' . number_format($totalTagihan, 0, ',', '.') . '. Harap lunasi di meja admin.';
+                $msg .= ' Ada tagihan denda (Keterlambatan/Kerusakan/Ganti Rugi) sebesar Rp ' . number_format($totalTagihan, 0, ',', '.') . '. Harap lunasi di meja admin.';
             }
 
             return response()->json(['status' => 'success', 'message' => $msg]);

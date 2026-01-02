@@ -444,6 +444,7 @@
 
     <script>
         const tarifDenda = {{ $dendaPerHari ?? 500 }};
+        const tarifRusak = {{ $dendaRusak ?? 10000 }};
 
         // --- SCANNER LOGIC ---
         let html5QrCodeSearch = null;
@@ -546,8 +547,11 @@
             // Loop semua dropdown kondisi
             document.querySelectorAll('.kondisi-input').forEach(select => {
                 if (select.value === 'hilang') {
-                    // Ambil harga dari atribut data-harga
+                    // Jika Hilang = Harga Buku
                     dendaGantiRugi += parseFloat(select.getAttribute('data-harga') || 0);
+                } else if (select.value === 'rusak') {
+                    // Jika Rusak = Tarif Denda Rusak (Setting)
+                    dendaGantiRugi += tarifRusak;
                 }
             });
 

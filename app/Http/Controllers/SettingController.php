@@ -36,10 +36,16 @@ class SettingController extends Controller
             ['value' => $request->max_lama_pinjam, 'type' => 'number']
         );
 
-        // 4. Simpan Max Buku (BARU)
+        // 4. Simpan Max Buku
         Setting::updateOrCreate(
             ['key' => 'max_buku_pinjam'],
             ['value' => $request->max_buku_pinjam, 'type' => 'number']
+        );
+
+        // Simpan Denda Rusak
+        Setting::updateOrCreate(
+            ['key' => 'denda_rusak'],
+            ['value' => $request->denda_rusak, 'type' => 'number']
         );
 
         return back()->with('success', 'Pengaturan sistem berhasil diperbarui.');
