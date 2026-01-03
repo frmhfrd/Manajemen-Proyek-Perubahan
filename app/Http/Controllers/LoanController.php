@@ -168,7 +168,7 @@ class LoanController extends Controller
     }
 
     // =========================================================================
-    // 2. FITUR PENGEMBALIAN (RETURN)
+    // 2. FITUR PENGEMBALIAN (RETURN) - SUPPORT PARSIAL
     // =========================================================================
 
     public function returnLoan(Request $request, string $id)
@@ -179,71 +179,97 @@ class LoanController extends Controller
             return back()->with('error', 'Transaksi ini sudah selesai sebelumnya!');
         }
 
+        // Validasi: Pastikan ada item yang dipilih (dicentang)
         $request->validate([
-            'kondisi' => 'required|array',
-            // Pastikan validasi menerima 'rusak'
-            'kondisi.*' => 'in:baik,rusak,hilang',
+            'items_to_return' => 'required|array|min:1',
+            'kondisi' => 'array',
         ]);
 
         try {
             DB::transaction(function () use ($loan, $request) {
-                // 1. Denda Waktu
                 $dendaPerHari = (int) (Setting::where('key', 'denda_harian')->value('value') ?? 500);
-
-                // PERBAIKAN: Ambil Denda Rusak
                 $nominalRusak = (int) (Setting::where('key', 'denda_rusak')->value('value') ?? 10000);
+                $today = Carbon::now()->startOfDay();
 
-                $tglKembali = Carbon::now()->startOfDay();
-                $jatuhTempo = Carbon::parse($loan->tgl_wajib_kembali)->startOfDay();
-                $loan->tgl_kembali = Carbon::now();
+                // ID Detail yang dicentang oleh admin
+                $selectedDetailIds = $request->input('items_to_return');
+                $inputKondisi = $request->input('kondisi', []);
 
-                $selisihHari = max(0, $jatuhTempo->diffInDays($tglKembali, false));
-                $dendaTelat = $selisihHari * $dendaPerHari;
+                $dendaGantiRugiSesiIni = 0;
 
-                $dendaGantiRugi = 0;
-                $inputs = $request->input('kondisi');
+                // 1. PROSES ITEM YANG DIPILIH SAJA
+                foreach ($selectedDetailIds as $detailId) {
+                    $detail = LoanDetail::where('id', $detailId)
+                                        ->where('loan_id', $loan->id)
+                                        ->where('status_item', 'dipinjam') // Hanya proses yang masih dipinjam
+                                        ->first();
 
-                foreach ($loan->details as $detail) {
-                    $kondisi = $inputs[$detail->id] ?? 'baik';
+                    if (!$detail) continue;
 
+                    $kondisi = $inputKondisi[$detailId] ?? 'baik';
+
+                    // Update Status Item
                     $detail->update([
-                        'status_item' => $kondisi == 'hilang' ? 'hilang' : 'kembali',
+                        'status_item' => ($kondisi == 'hilang') ? 'hilang' : 'kembali',
                         'kondisi_kembali' => $kondisi
                     ]);
 
+                    // Update Stok & Hitung Denda Barang
                     if ($kondisi == 'hilang') {
                         Book::where('id', $detail->book_id)->increment('stok_hilang');
                         $hargaBuku = $detail->book->harga ?? 0;
-                        $dendaGantiRugi += $hargaBuku;
-
+                        $dendaGantiRugiSesiIni += $hargaBuku;
                     } elseif ($kondisi == 'rusak') {
-                        // PERBAIKAN: Implementasi Logika Rusak
                         Book::where('id', $detail->book_id)->increment('stok_rusak');
-                        $dendaGantiRugi += $nominalRusak; // Tambah denda 10rb (atau sesuai setting)
-
+                        $dendaGantiRugiSesiIni += $nominalRusak;
                     } else {
                         Book::where('id', $detail->book_id)->increment('stok_tersedia');
                     }
                 }
 
-                // ... (Sisa kode penyimpanan total_denda tetap sama) ...
-                $loan->total_denda = $dendaTelat + $dendaGantiRugi;
+                // 2. CEK SISA BUKU (Real-time Database Check)
+                $sisaBuku = LoanDetail::where('loan_id', $loan->id)
+                                      ->where('status_item', 'dipinjam')
+                                      ->count();
 
-                if ($loan->total_denda == 0) {
-                    $loan->status_pembayaran = 'paid';
+                // 3. KEPUTUSAN FINAL
+                if ($sisaBuku === 0) {
+                    // SEMUA KEMBALI -> TUTUP TRANSAKSI & HITUNG DENDA WAKTU
+                    $jatuhTempo = Carbon::parse($loan->tgl_wajib_kembali)->startOfDay();
+                    $selisihHari = max(0, $jatuhTempo->diffInDays($today, false));
+                    $dendaWaktu = $selisihHari * $dendaPerHari;
+
+                    $loan->tgl_kembali = now();
+                    $loan->status_transaksi = 'selesai';
+
+                    // Total Denda Final = Denda Waktu + Denda Barang (Akumulasi)
+                    // Kita tambahkan denda ganti rugi sesi ini ke total yang mungkin sudah ada sebelumnya
+                    $loan->total_denda = ($loan->total_denda ?? 0) + $dendaWaktu + $dendaGantiRugiSesiIni;
+
                 } else {
-                    $loan->status_pembayaran = 'pending';
-                    if ($request->has('denda_lunas')) {
-                        $loan->status_pembayaran = 'paid';
-                        $loan->tipe_pembayaran   = 'tunai';
+                    // MASIH ADA -> BIARKAN BERJALAN (PARSIAL)
+                    // Hanya tambahkan denda ganti rugi (jika ada) ke tagihan berjalan
+                    if ($dendaGantiRugiSesiIni > 0) {
+                        $loan->total_denda = ($loan->total_denda ?? 0) + $dendaGantiRugiSesiIni;
                     }
                 }
 
-                $loan->status_transaksi = 'selesai';
+                // 4. STATUS PEMBAYARAN
+                if ($loan->total_denda > 0) {
+                    $loan->status_pembayaran = 'pending';
+                    // Jika admin mencentang "Bayar Lunas" di modal (untuk denda sesi ini)
+                    if ($request->has('denda_lunas') && $sisaBuku === 0) {
+                        $loan->status_pembayaran = 'paid';
+                        $loan->tipe_pembayaran = 'tunai';
+                    }
+                } elseif ($sisaBuku === 0) {
+                    $loan->status_pembayaran = 'paid';
+                }
+
                 $loan->save();
             });
 
-            return back()->with('success', 'Buku berhasil dikembalikan. Status kondisi telah dicatat.');
+            return back()->with('success', 'Buku terpilih berhasil dikembalikan.');
 
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal memproses: ' . $e->getMessage());

@@ -239,7 +239,7 @@ class PublicController extends Controller
         ]);
     }
 
-    // 3. API: Proses Pengembalian (Update: Hitung Denda Waktu & Ganti Rugi)
+   // 3. API: Proses Pengembalian (REVISI FINAL: DIRECT DB CHECK)
     public function processSelfReturn(Request $request)
     {
         $items = $request->items;
@@ -249,73 +249,84 @@ class PublicController extends Controller
             DB::transaction(function () use ($items, &$totalTagihan) {
 
                 $dendaPerHari = (int) (Setting::where('key', 'denda_harian')->value('value') ?? 500);
-                // Optimasi: Ambil denda rusak di luar loop
                 $nominalRusak = (int) (Setting::where('key', 'denda_rusak')->value('value') ?? 10000);
-
                 $today = Carbon::now()->startOfDay();
+
+                // Grouping items by Loan ID
                 $groupedItems = collect($items)->groupBy('loan_id');
 
-                foreach ($groupedItems as $loanId => $details) {
-                    $loan = Loan::with('details.book')->find($loanId);
+                foreach ($groupedItems as $loanId => $detailsToReturn) {
+                    // Lock for Update agar aman dari race condition
+                    $loan = Loan::where('id', $loanId)->lockForUpdate()->first();
 
+                    // Skip jika loan tidak valid atau sudah selesai
                     if (!$loan || $loan->status_transaksi == 'selesai') continue;
 
-                    // A. Hitung Denda Waktu (Per Transaksi)
-                    $jatuhTempo = Carbon::parse($loan->tgl_wajib_kembali)->startOfDay();
-                    $selisihHari = $jatuhTempo->diffInDays($today, false);
-                    $telatHari = max(0, $selisihHari);
-                    $dendaWaktu = $telatHari * $dendaPerHari;
-
-                    // Update Header Loan
-                    $loan->tgl_kembali = now();
-                    $loan->status_transaksi = 'selesai';
-
-                    // B. Proses Detail Buku (Stok & Ganti Rugi)
                     $dendaGantiRugi = 0;
 
-                    foreach ($details as $item) {
-                        $dbDetail = $loan->details->where('id', $item['detail_id'])->first();
+                    // --- STEP 1: UPDATE STATUS ITEM ---
+                    foreach ($detailsToReturn as $item) {
+                        // Cari detail spesifik LANGSUNG KE DB
+                        $dbDetail = LoanDetail::where('id', $item['detail_id'])
+                                              ->where('loan_id', $loan->id)
+                                              ->where('status_item', 'dipinjam') // Pastikan hanya update yang dipinjam
+                                              ->first();
+
                         if (!$dbDetail) continue;
 
-                        $kondisi = $item['status']; // 'kembali', 'rusak', atau 'hilang'
+                        $kondisi = $item['status']; // 'kembali', 'rusak', 'hilang'
 
-                        // [PERBAIKAN] Logika Status yang Benar
-                        // Jika rusak/hilang, status_item tetap dianggap 'kembali' (fisik ada) atau 'hilang' (tidak ada)
-                        // Tapi kondisi_kembali mencatat kondisi fisiknya.
+                        // Update Status di Database
                         $dbDetail->update([
                             'status_item' => ($kondisi == 'hilang') ? 'hilang' : 'kembali',
-                            'kondisi_kembali' => $kondisi // Simpan: 'baik', 'rusak', atau 'hilang'
+                            'kondisi_kembali' => $kondisi
                         ]);
 
-                        // LOGIKA STOK & HARGA
+                        // Logika Stok
                         if ($kondisi == 'hilang') {
-                            // Stok Hilang +1
                             Book::where('id', $dbDetail->book_id)->increment('stok_hilang');
-                            // Tambah Denda Harga Buku
-                            $hargaBuku = $dbDetail->book->harga ?? 0;
-                            $dendaGantiRugi += $hargaBuku;
-
+                            $dendaGantiRugi += ($dbDetail->book->harga ?? 0);
                         } elseif ($kondisi == 'rusak') {
-                            // [PERBAIKAN] Tambah ke Stok Rusak
                             Book::where('id', $dbDetail->book_id)->increment('stok_rusak');
-
-                            // Tambah Denda Rusak
                             $dendaGantiRugi += $nominalRusak;
-
                         } else {
-                            // Buku Kembali (Normal) -> Stok Tersedia +1
                             Book::where('id', $dbDetail->book_id)->increment('stok_tersedia');
                         }
                     }
 
-                    // C. Simpan Total Denda ke Database
-                    $loan->total_denda = $dendaWaktu + $dendaGantiRugi;
-                    $totalTagihan += $loan->total_denda;
+                    // --- STEP 2: HITUNG SISA BUKU (DIRECT QUERY) ---
+                    // Jangan pakai $loan->details (cache), tapi query baru ke tabel loan_details
+                    $sisaBuku = LoanDetail::where('loan_id', $loan->id)
+                                          ->where('status_item', 'dipinjam')
+                                          ->count();
 
-                    // Tentukan Status Bayar
-                    if ($loan->total_denda > 0) {
-                        $loan->status_pembayaran = 'pending'; // Harus bayar ke admin (pending/unpaid)
+                    // --- STEP 3: KEPUTUSAN FINAL ---
+                    if ($sisaBuku === 0) {
+                        // HABIS -> TUTUP TRANSAKSI
+                        $jatuhTempo = Carbon::parse($loan->tgl_wajib_kembali)->startOfDay();
+                        $selisihHari = $jatuhTempo->diffInDays($today, false);
+                        $telatHari = max(0, $selisihHari);
+                        $dendaWaktu = $telatHari * $dendaPerHari;
+
+                        $loan->tgl_kembali = now();
+                        $loan->status_transaksi = 'selesai';
+                        $loan->total_denda = $dendaWaktu + $dendaGantiRugi; // Set total final
+
+                        $totalTagihan += ($dendaWaktu + $dendaGantiRugi);
+
                     } else {
+                        // MASIH ADA -> JANGAN TUTUP
+                        // Tambahkan denda ganti rugi (jika ada) ke total berjalan
+                        if ($dendaGantiRugi > 0) {
+                            $loan->total_denda += $dendaGantiRugi;
+                            $totalTagihan += $dendaGantiRugi;
+                        }
+                    }
+
+                    // Status Bayar
+                    if ($loan->total_denda > 0) {
+                        $loan->status_pembayaran = 'pending';
+                    } elseif ($sisaBuku === 0 && $loan->total_denda == 0) {
                         $loan->status_pembayaran = 'paid';
                     }
 
@@ -323,16 +334,15 @@ class PublicController extends Controller
                 }
             });
 
-            // Susun Pesan Respon
-            $msg = 'Pengembalian Berhasil!';
+            $msg = 'Buku berhasil diproses.';
             if ($totalTagihan > 0) {
-                $msg .= ' Ada tagihan denda (Keterlambatan/Kerusakan/Ganti Rugi) sebesar Rp ' . number_format($totalTagihan, 0, ',', '.') . '. Harap lunasi di meja admin.';
+                $msg .= ' Tagihan denda sesi ini: Rp ' . number_format($totalTagihan, 0, ',', '.') . '. Harap lunasi di admin.';
             }
 
             return response()->json(['status' => 'success', 'message' => $msg]);
 
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()]);
+            return response()->json(['status' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
         }
     }
 }
