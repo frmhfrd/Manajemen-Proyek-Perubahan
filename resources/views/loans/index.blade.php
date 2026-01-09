@@ -26,6 +26,7 @@
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
 
+            {{-- ALERT NOTIFIKASI --}}
             @if(session('success'))
                 <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded shadow-sm">
                     <p class="font-bold">Berhasil</p>
@@ -40,84 +41,101 @@
                 </div>
             @endif
 
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+            {{-- CONTAINER UTAMA --}}
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-xl border border-gray-200 dark:border-gray-700">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
 
                     {{-- Header Tools --}}
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                        <form action="{{ route('loans.index') }}" method="GET" class="w-full md:w-1/2" id="searchForm">
-                            <div class="flex gap-2">
-                                <div class="relative flex-1">
-                                    <input type="text" id="searchInput" name="search" value="{{ request('search') }}" placeholder="Cari Kode / Nama Siswa..."
-                                        class="w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 pl-10 h-10">
-                                </div>
-                                <button type="button" onclick="startSearchScanner()" class="bg-yellow-500 text-white w-10 h-10 rounded-md hover:bg-yellow-600 shadow-sm transition flex items-center justify-center flex-shrink-0" title="Scan Kartu/Barcode">
+                        <form action="{{ route('loans.index') }}" method="GET" class="w-full md:w-2/3 flex flex-col md:flex-row gap-2" id="searchForm">
+
+                            {{-- DROPDOWN FILTER LENGKAP --}}
+                            <select name="filter" onchange="document.getElementById('searchForm').submit()"
+                                    class="rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3">
+                                <option value="">Semua Transaksi</option>
+                                <option value="selesai" {{ request('filter') == 'selesai' ? 'selected' : '' }}>Selesai (Lunas)</option>
+                                <hr disabled>
+                                <option value="telat_only" {{ request('filter') == 'telat_only' ? 'selected' : '' }}>Denda: Terlambat Saja</option>
+                                <option value="telat_rusak" {{ request('filter') == 'telat_rusak' ? 'selected' : '' }}>Denda: Telat + Rusak</option>
+                                <option value="telat_hilang" {{ request('filter') == 'telat_hilang' ? 'selected' : '' }}>Denda: Telat + Hilang</option>
+                                <hr disabled>
+                                <option value="rusak_only" {{ request('filter') == 'rusak_only' ? 'selected' : '' }}>Ganti Rugi: Buku Rusak (Tepat Waktu)</option>
+                                <option value="hilang_only" {{ request('filter') == 'hilang_only' ? 'selected' : '' }}>Ganti Rugi: Buku Hilang (Tepat Waktu)</option>
+                            </select>
+
+                            {{-- INPUT SEARCH --}}
+                            <div class="relative flex-1 flex gap-2">
+                                <input type="text" id="searchInput" name="search" value="{{ request('search') }}" placeholder="Cari Kode / Nama Siswa..."
+                                    class="w-full rounded-md border-gray-300 dark:bg-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 pl-4 h-10">
+
+                                <button type="button" onclick="startSearchScanner()" class="bg-yellow-500 text-white w-10 h-10 rounded-md hover:bg-yellow-600 shadow-sm flex items-center justify-center flex-shrink-0" title="Scan Barcode">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
                                 </button>
+
                                 <button type="submit" class="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-700 h-10">Cari</button>
                             </div>
                         </form>
 
-                        <a href="{{ route('loans.refresh_all') }}" class="flex items-center gap-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-300 font-bold py-2 px-4 rounded-lg transition shadow-sm h-10">
+                        <a href="{{ route('loans.refresh_all') }}" class="flex items-center gap-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-300 font-bold py-2 px-4 rounded-lg transition shadow-sm h-10 text-sm whitespace-nowrap">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
-                            Refresh Status Bayar
+                            Refresh Status
                         </a>
                     </div>
 
-                    {{-- Tabel --}}
-                    <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    {{-- TABEL DATA --}}
+                    <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600">
                         <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                             <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                 <tr>
                                     <th class="px-4 py-3">Transaksi</th>
                                     <th class="px-4 py-3">Peminjam</th>
                                     <th class="px-4 py-3 text-center">Tempo</th>
-                                    <th class="px-4 py-3 text-center">Progres Buku</th>
+                                    <th class="px-4 py-3 text-center">Progres</th>
                                     <th class="px-4 py-3 text-center">Status</th>
                                     <th class="px-4 py-3 text-center" width="100">Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-800">
                                 @forelse($loans as $loan)
-
-                                @php
-                                    $totalBuku = $loan->details->count();
-                                    $sudahKembali = $loan->details->where('status_item', '!=', 'dipinjam')->count();
-                                    $isParsial = ($sudahKembali > 0 && $sudahKembali < $totalBuku);
-                                @endphp
-
-                                <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                                    <td class="px-4 py-3">
+                                    @php
+                                        $totalBuku = $loan->details->count();
+                                        $sudahKembali = $loan->details->where('status_item', '!=', 'dipinjam')->count();
+                                        $isParsial = ($sudahKembali > 0 && $sudahKembali < $totalBuku);
+                                    @endphp
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                                    {{-- Transaksi --}}
+                                    <td class="px-4 py-3 align-middle">
                                         <div class="font-bold text-gray-900 dark:text-white">{{ $loan->kode_transaksi }}</div>
                                         <div class="mt-1">
-                                            @if($loan->user_id == 3)
-                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800">🤖 Kiosk</span>
-                                            @else
-                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">👤 Admin</span>
-                                            @endif
+                                            @if($loan->user_id == 3) <span class="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-[10px] font-medium">🤖 Kiosk</span>
+                                            @else <span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-medium">👤 Admin</span> @endif
                                         </div>
                                     </td>
 
-                                    <td class="px-4 py-3">
-                                        <div class="font-medium text-gray-900 dark:text-white">{{ $loan->member->nama_lengkap }}</div>
-                                        <div class="text-xs text-gray-500">{{ $loan->member->kode_anggota }}</div>
+                                    {{-- Peminjam --}}
+                                    <td class="px-4 py-3 align-middle">
+                                        <div class="font-bold text-gray-900 dark:text-white">{{ $loan->member->nama_lengkap }}</div>
+                                        <div class="text-xs font-mono text-gray-500">{{ $loan->member->kode_anggota }}</div>
                                     </td>
 
-                                    <td class="px-4 py-3 text-center">
+                                    {{-- Tempo --}}
+                                    <td class="px-4 py-3 text-center align-middle">
                                         <div class="text-sm font-bold {{ $loan->tgl_wajib_kembali->isPast() && $loan->status_transaksi == 'berjalan' ? 'text-red-600' : 'text-gray-700' }}">
                                             {{ $loan->tgl_wajib_kembali->format('d M') }}
                                         </div>
                                     </td>
 
-                                    <td class="px-4 py-3 text-center">
+                                    {{-- Progres --}}
+                                    <td class="px-4 py-3 text-center align-middle">
                                         <span class="inline-flex items-center justify-center px-3 py-1 rounded-full font-bold text-xs border {{ $isParsial ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-indigo-50 text-indigo-600 border-indigo-100' }}">
                                             {{ $sudahKembali }} / {{ $totalBuku }}
                                         </span>
                                     </td>
 
-                                    <td class="px-4 py-3 text-center">
+                                    {{-- Status --}}
+                                    <td class="px-4 py-3 text-center align-middle">
                                         <div class="flex flex-col gap-1 items-center">
                                             @if($loan->status_transaksi == 'selesai')
                                                 <span class="px-2 py-1 text-[10px] font-bold rounded-full bg-green-100 text-green-700 border border-green-200">✅ Selesai</span>
@@ -128,16 +146,15 @@
                                             @else
                                                 <span class="px-2 py-1 text-[10px] font-bold rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200">⏳ Dipinjam</span>
                                             @endif
-
                                             @if($loan->status_pembayaran == 'pending')
                                                 <span class="text-[10px] font-bold text-orange-600 bg-orange-50 px-1 rounded border border-orange-100">Belum Lunas</span>
                                             @endif
                                         </div>
                                     </td>
 
+                                    {{-- Aksi --}}
                                     <td class="px-4 py-3 text-center align-middle">
                                         @if($loan->status_transaksi != 'selesai')
-                                            {{-- [UPDATE] Menggunakan nama fungsi BARU: initReturnModal --}}
                                             <button type="button"
                                                 onclick="initReturnModal(
                                                     '{{ route('loans.return', $loan->id) }}',
@@ -170,30 +187,30 @@
                                     </td>
                                 </tr>
                                 @empty
-                                <tr>
-                                    <td colspan="6" class="px-6 py-10 text-center text-gray-400 bg-gray-50">Belum ada data.</td>
-                                </tr>
+                                <tr><td colspan="6" class="px-6 py-10 text-center text-gray-400">Belum ada data.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
                     </div>
-                    <div class="mt-4">{{ $loans->withQueryString()->links() }}</div>
+
+                    {{-- Pagination --}}
+                    <div class="mt-6">
+                        {{ $loans->withQueryString()->links() }}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    {{-- MODAL PENGEMBALIAN (Fixed Center) --}}
+    {{-- MODAL PENGEMBALIAN (CENTERED) --}}
     <div id="returnModal" class="fixed inset-0 z-[60] hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        {{-- Flex Wrapper --}}
-        <div class="flex min-h-screen items-center justify-center p-4 text-center">
+        <div class="flex min-h-screen items-center justify-center p-4 text-center w-full">
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeReturnModal()"></div>
-
-            {{-- Modal Panel --}}
-            <div class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-2xl transition-all sm:w-full sm:max-w-lg border-t-8 border-blue-500">
+            <div class="relative w-full max-w-lg transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-xl transition-all border-t-8 border-blue-500">
                 <form id="returnForm" method="POST" action="">
                     @csrf @method('PUT')
                     <div class="bg-white dark:bg-gray-800 px-6 py-6">
+                        {{-- Header Modal --}}
                         <div class="flex items-center gap-4 mb-6 border-b pb-4">
                             <div class="flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
                                 <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -207,31 +224,40 @@
                             </div>
                         </div>
 
+                        {{-- List Buku --}}
                         <div class="mb-4">
                             <p class="text-xs font-bold text-gray-500 uppercase mb-2">Daftar Buku:</p>
                             <div id="bookListContainer" class="space-y-2 max-h-60 overflow-y-auto bg-gray-50 p-3 rounded-xl border border-gray-200"></div>
                         </div>
 
-                        <div id="dendaArea" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                        {{-- Alert Section (Dinamis via JS) --}}
+                        <div id="dendaArea" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 mb-3">
                             <div class="flex justify-between items-start">
                                 <div>
-                                    <p class="text-red-800 font-bold text-sm">⚠️ Terlambat <span id="telatHari">0</span> Hari</p>
-                                    <p class="text-xs text-red-600 mt-1">Total Tagihan:</p>
+                                    <p class="text-red-800 font-bold text-sm">TOTAL TAGIHAN (Denda + Ganti Rugi)</p>
+                                    <p class="text-xs text-red-600 mt-1">
+                                        Detail: <span id="rincianDendaText" class="font-medium">-</span>
+                                    </p>
                                 </div>
-                                <p class="text-2xl font-extrabold text-red-600">Rp <span id="nominalDenda">0</span></p>
+                                <div class="text-right">
+                                    <p class="text-2xl font-extrabold text-red-600">Rp <span id="nominalDenda">0</span></p>
+                                </div>
                             </div>
+                            {{-- Checkbox Bayar --}}
                             <div class="mt-3 bg-white p-2 rounded-lg border border-red-100 flex items-start gap-2">
                                 <input id="konfirmasiBayar" type="checkbox" name="denda_lunas" class="mt-1 focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded">
-                                <label id="labelBayar" for="konfirmasiBayar" class="text-xs font-medium text-gray-700 cursor-pointer">Siswa membayar lunas denda ini sekarang.</label>
+                                <label id="labelBayar" for="konfirmasiBayar" class="text-xs font-medium text-gray-700 cursor-pointer">Siswa membayar lunas tagihan ini sekarang.</label>
                             </div>
                         </div>
 
+                        {{-- Info Aman --}}
                         <div id="infoNormal" class="hidden bg-green-50 text-green-700 px-4 py-3 rounded-xl text-sm font-bold border border-green-200 flex items-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            Tepat Waktu. Tidak ada denda.
+                            Kondisi Baik & Tepat Waktu.
                         </div>
                     </div>
 
+                    {{-- Footer Modal --}}
                     <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex flex-row-reverse gap-3">
                         <button type="submit" class="inline-flex justify-center rounded-xl border border-transparent shadow-sm px-5 py-2.5 bg-blue-600 text-base font-bold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm">
                             Simpan Perubahan
@@ -245,11 +271,11 @@
         </div>
     </div>
 
-    {{-- MODAL BAYAR (Fixed Center) --}}
-    <div id="payModal" class="fixed inset-0 z-[60] hidden overflow-y-auto">
-        <div class="flex min-h-screen items-center justify-center p-4 text-center">
+    {{-- MODAL BAYAR --}}
+    <div id="payModal" class="fixed inset-0 z-[60] hidden">
+        <div class="flex min-h-screen items-center justify-center p-4 text-center w-full">
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closePayModal()"></div>
-            <div class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-2xl transition-all sm:w-full sm:max-w-md border-t-8 border-green-500">
+            <div class="relative w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left shadow-xl transition-all border-t-8 border-green-500">
                 <form id="payForm" method="POST" action="">
                     @csrf @method('PUT')
                     <div class="bg-white px-6 py-6">
@@ -266,19 +292,15 @@
                         </div>
                     </div>
                     <div class="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row-reverse gap-3">
-                        <button type="submit" class="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-3 bg-green-600 text-base font-bold text-white hover:bg-green-700 sm:text-sm">
-                            Terima Pembayaran
-                        </button>
-                        <button type="button" onclick="closePayModal()" class="w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-100 sm:text-sm">
-                            Batal
-                        </button>
+                        <button type="submit" class="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-3 bg-green-600 text-base font-bold text-white hover:bg-green-700 sm:text-sm">Terima Pembayaran</button>
+                        <button type="button" onclick="closePayModal()" class="w-full inline-flex justify-center rounded-xl border border-gray-300 shadow-sm px-4 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-100 sm:text-sm">Batal</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    {{-- MODAL SUKSES (Fixed Center) --}}
+    {{-- MODAL SUKSES --}}
     @if(session('new_loan'))
         @php $newLoan = session('new_loan'); @endphp
         <div id="successTxModal" class="fixed inset-0 z-[70] flex min-h-screen items-center justify-center p-4">
@@ -302,7 +324,7 @@
         <script> function closeSuccessTxModal() { document.getElementById('successTxModal').classList.add('hidden'); } </script>
     @endif
 
-    {{-- SCANNER MODAL (Fixed Center) --}}
+    {{-- SCANNER MODAL --}}
     <div id="searchScannerModal" class="hidden fixed inset-0 bg-black/90 z-[80] flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl w-full max-w-md overflow-hidden relative shadow-2xl border-4 border-white">
             <div class="bg-gray-100 p-4 flex justify-between items-center border-b">
@@ -313,6 +335,7 @@
         </div>
     </div>
 
+    {{-- SCRIPT UTAMA --}}
     <script>
         const tarifDenda = {{ $dendaPerHari ?? 500 }};
         const tarifRusak = {{ $dendaRusak ?? 10000 }};
@@ -327,18 +350,16 @@
         }
         function stopSearchScanner() { if(html5QrCodeSearch) html5QrCodeSearch.stop().then(() => document.getElementById('searchScannerModal').classList.add('hidden')); else document.getElementById('searchScannerModal').classList.add('hidden'); }
 
-        // --- FUNGSI UTAMA (RENAMED TO AVOID CONFLICT) ---
         function initReturnModal(url, kode, nama, tglTempo, statusBayar, books) {
             document.getElementById('returnForm').action = url;
             document.getElementById('modalKode').innerText = kode;
-            document.getElementById('modalNama').innerText = nama; // PASTI ADA SEKARANG
+            document.getElementById('modalNama').innerText = nama;
 
             const today = new Date(); today.setHours(0,0,0,0);
             const tempo = new Date(tglTempo); tempo.setHours(0,0,0,0);
             const diffDays = Math.ceil((today - tempo) / (1000 * 60 * 60 * 24));
 
             window.currentDiffDays = diffDays > 0 ? diffDays : 0;
-            document.getElementById('telatHari').innerText = window.currentDiffDays;
 
             const container = document.getElementById('bookListContainer');
             container.innerHTML = '';
@@ -346,6 +367,7 @@
             if (books && books.length > 0) {
                 books.forEach((book, index) => {
                     let hargaFormatted = new Intl.NumberFormat('id-ID').format(book.harga);
+                    let rusakFormatted = new Intl.NumberFormat('id-ID').format(tarifRusak);
                     let isDone = (book.status !== 'dipinjam');
 
                     let leftControl = isDone
@@ -364,7 +386,7 @@
                                 <div class="flex justify-between items-start">
                                     <div>
                                         <p class="text-sm font-bold text-gray-800 line-clamp-1">${index+1}. ${book.judul}</p>
-                                        <p class="text-xs text-gray-500">Rp ${hargaFormatted}</p>
+                                        <p class="text-xs text-gray-500">Harga: Rp ${hargaFormatted}</p>
                                     </div>
                                     ${statusBadge}
                                 </div>
@@ -374,8 +396,8 @@
                                             class="kondisi-input block w-full text-xs border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                                             onchange="hitungTotalDenda()" data-harga="${book.harga}">
                                         <option value="baik">Kondisi: Baik</option>
-                                        <option value="rusak">Kondisi: Rusak (Denda)</option>
-                                        <option value="hilang">Kondisi: Hilang (Ganti Rugi)</option>
+                                        <option value="rusak">Rusak (Denda Rp ${rusakFormatted})</option>
+                                        <option value="hilang">Hilang (Ganti Rp ${hargaFormatted})</option>
                                     </select>
                                 </div>` : ''}
                             </div>
@@ -398,9 +420,13 @@
             hitungTotalDenda();
         }
 
+        // --- REVISI LOGIC: HITUNG TOTAL GABUNGAN (DENDA WAKTU + DENDA BARANG) ---
         function hitungTotalDenda() {
-            let totalDenda = 0;
+            let dendaBarang = 0;
             let checkedCount = 0;
+            let hasRusak = false;
+            let hasHilang = false;
+
             const checkboxes = document.querySelectorAll('.item-checkbox:checked');
             checkedCount = checkboxes.length;
 
@@ -408,27 +434,35 @@
                 const bookId = cb.value;
                 const select = document.getElementById('kondisi_' + bookId);
                 if (select) {
-                    if (select.value === 'hilang') totalDenda += parseFloat(select.getAttribute('data-harga') || 0);
-                    else if (select.value === 'rusak') totalDenda += tarifRusak;
+                    if (select.value === 'hilang') {
+                        dendaBarang += parseFloat(select.getAttribute('data-harga') || 0);
+                        hasHilang = true;
+                    } else if (select.value === 'rusak') {
+                        dendaBarang += tarifRusak;
+                        hasRusak = true;
+                    }
                 }
             });
 
-            // Hitung Denda Waktu hanya jika ada yang dicentang
-            // (Disederhanakan: Jika telat, tampilkan potensi denda waktu)
-            let dendaWaktuEstimasi = 0;
+            // Hitung Denda Waktu (Hanya estimasi visual, backend yg menentukan final)
+            let dendaWaktu = 0;
             if (window.currentDiffDays > 0) {
-                dendaWaktuEstimasi = window.currentDiffDays * tarifDenda;
+                dendaWaktu = window.currentDiffDays * tarifDenda;
             }
 
-            let grandTotal = totalDenda; // Denda barang dulu
+            // TOTAL TAGIHAN (GABUNGAN)
+            let grandTotal = dendaBarang + dendaWaktu;
 
+            // Update UI Nominal
             document.getElementById('nominalDenda').innerText = new Intl.NumberFormat('id-ID').format(grandTotal);
 
-            if (window.currentDiffDays > 0) {
-               document.getElementById('telatHari').innerText = window.currentDiffDays + " (Rp " + new Intl.NumberFormat('id-ID').format(dendaWaktuEstimasi) + ")";
-            } else {
-               document.getElementById('telatHari').innerText = "0";
-            }
+            // Update Rincian Text
+            let rincian = [];
+            if(dendaWaktu > 0) rincian.push(`Keterlambatan (Rp ${new Intl.NumberFormat('id-ID').format(dendaWaktu)})`);
+            if(hasRusak) rincian.push(`Kerusakan Barang`);
+            if(hasHilang) rincian.push(`Kehilangan Barang`);
+
+            document.getElementById('rincianDendaText').innerText = rincian.length > 0 ? rincian.join(' + ') : 'Tidak ada denda';
 
             const dendaArea = document.getElementById('dendaArea');
             const infoNormal = document.getElementById('infoNormal');
@@ -444,10 +478,13 @@
                 btnSubmit.innerText = `Kembalikan (${checkedCount} Buku)`;
             }
 
-            if (grandTotal > 0 || window.currentDiffDays > 0) {
-                dendaArea.classList.remove('hidden'); infoNormal.classList.add('hidden');
+            // Toggle Tampilan Area Denda
+            if (grandTotal > 0) {
+                dendaArea.classList.remove('hidden');
+                infoNormal.classList.add('hidden');
             } else {
-                dendaArea.classList.add('hidden'); infoNormal.classList.remove('hidden');
+                dendaArea.classList.add('hidden');
+                infoNormal.classList.remove('hidden');
             }
         }
 

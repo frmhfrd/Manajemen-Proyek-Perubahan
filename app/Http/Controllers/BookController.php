@@ -182,4 +182,38 @@ class BookController extends Controller
             return back()->with('error', 'Gagal menghapus data: ' . $e->getMessage());
         }
     }
+
+    // Menampilkan daftar buku yang rusak
+    public function indexRusak()
+    {
+        // Ambil buku yang punya stok rusak > 0
+        $books = \App\Models\Book::where('stok_rusak', '>', 0)->get();
+        return view('books.rusak', compact('books'));
+    }
+
+    // Proses perbaikan atau pemusnahan
+    public function processRusak(Request $request, $id)
+    {
+        $book = \App\Models\Book::findOrFail($id);
+        $action = $request->action; // 'repair' atau 'destroy'
+        $qty = $request->qty; // Jumlah buku yang diproses
+
+        if ($qty > $book->stok_rusak) {
+            return back()->with('error', 'Jumlah melebihi stok rusak yang ada!');
+        }
+
+        if ($action == 'repair') {
+            // Perbaiki: Kurangi stok rusak, Tambah stok tersedia
+            $book->decrement('stok_rusak', $qty);
+            $book->increment('stok_tersedia', $qty);
+            $msg = "$qty Buku berhasil diperbaiki dan kembali ke rak.";
+        } else {
+            // Musnahkan: Kurangi stok rusak, Tambah stok hilang (aset dihapus)
+            $book->decrement('stok_rusak', $qty);
+            $book->increment('stok_hilang', $qty); // Atau biarkan hilang selamanya
+            $msg = "$qty Buku rusak telah dimusnahkan dari inventaris.";
+        }
+
+        return back()->with('success', $msg);
+    }
 }

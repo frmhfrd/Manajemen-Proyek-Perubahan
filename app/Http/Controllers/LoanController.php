@@ -24,6 +24,7 @@ class LoanController extends Controller
     {
         $query = Loan::with(['member', 'user', 'details']);
 
+        // 1. PENCARIAN
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;
             $query->where('kode_transaksi', 'like', "%{$search}%")
@@ -32,7 +33,64 @@ class LoanController extends Controller
                   });
         }
 
+        // 2. FILTER STATUS & KONDISI (LOGIKA DIPERBARUI)
+        if ($request->has('filter') && $request->filter != '') {
+            $filter = $request->filter;
+
+            if ($filter == 'selesai') {
+                // ✅ Lunas
+                $query->where('status_transaksi', 'selesai')
+                      ->where('status_pembayaran', 'paid');
+            }
+            elseif ($filter == 'telat_only') {
+                // ⏳ Telat SAJA (Fisik Aman)
+                $query->where('status_transaksi', 'selesai')
+                      ->where('status_pembayaran', '!=', 'paid')
+                      ->whereRaw('DATE(tgl_kembali) > DATE(tgl_wajib_kembali)')
+                      ->whereDoesntHave('details', function($q) {
+                          $q->whereIn('kondisi_kembali', ['rusak', 'hilang']);
+                      });
+            }
+            elseif ($filter == 'telat_rusak') {
+                // ⏳⚠️ Telat + Rusak (Double Denda)
+                $query->where('status_transaksi', 'selesai')
+                      ->where('status_pembayaran', '!=', 'paid')
+                      ->whereRaw('DATE(tgl_kembali) > DATE(tgl_wajib_kembali)')
+                      ->whereHas('details', function($q) {
+                          $q->where('kondisi_kembali', 'rusak');
+                      });
+            }
+            elseif ($filter == 'telat_hilang') {
+                // ⏳❌ Telat + Hilang (Double Denda)
+                $query->where('status_transaksi', 'selesai')
+                      ->where('status_pembayaran', '!=', 'paid')
+                      ->whereRaw('DATE(tgl_kembali) > DATE(tgl_wajib_kembali)')
+                      ->whereHas('details', function($q) {
+                          $q->where('kondisi_kembali', 'hilang');
+                      });
+            }
+            elseif ($filter == 'rusak_only') {
+                // ⚠️ Rusak SAJA (Tepat Waktu)
+                $query->where('status_transaksi', 'selesai')
+                      ->where('status_pembayaran', '!=', 'paid')
+                      ->whereRaw('DATE(tgl_kembali) <= DATE(tgl_wajib_kembali)')
+                      ->whereHas('details', function($q) {
+                          $q->where('kondisi_kembali', 'rusak');
+                      });
+            }
+            elseif ($filter == 'hilang_only') {
+                // ❌ Hilang SAJA (Tepat Waktu)
+                $query->where('status_transaksi', 'selesai')
+                      ->where('status_pembayaran', '!=', 'paid')
+                      ->whereRaw('DATE(tgl_kembali) <= DATE(tgl_wajib_kembali)')
+                      ->whereHas('details', function($q) {
+                          $q->where('kondisi_kembali', 'hilang');
+                      });
+            }
+        }
+
         $loans = $query->orderBy('id', 'desc')->paginate(10);
+
         $dendaPerHari = Setting::where('key', 'denda_harian')->value('value') ?? 500;
         $dendaRusak   = Setting::where('key', 'denda_rusak')->value('value') ?? 10000;
 
@@ -136,27 +194,27 @@ class LoanController extends Controller
 
             // B. KIRIM NOTIFIKASI WA (Helper)
             // (Kode WA Anda tetap di sini, saya sembunyikan biar pendek)
-            //  try {
-            //     $newLoan->load(['member', 'details.book']);
-            //     if (!empty($newLoan->member->no_telepon)) {
-            //         $listBuku = "";
-            //         foreach ($newLoan->details as $index => $detail) {
-            //             $judul = $detail->book->judul ?? 'Buku';
-            //             $listBuku .= ($index + 1) . ". $judul\n";
-            //         }
-            //         $pesan = "*BUKTI PEMINJAMAN BUKU*\n--------------------------------\n" .
-            //                  "Halo, *{$newLoan->member->nama_lengkap}*\n\n" .
-            //                  "Peminjaman berhasil dicatat.\n" .
-            //                  "📝 Kode: *{$newLoan->kode_transaksi}*\n" .
-            //                  "📅 Tgl Pinjam: " . date('d-m-Y', strtotime($newLoan->tgl_pinjam)) . "\n" .
-            //                  "📅 *Wajib Kembali: " . date('d-m-Y', strtotime($newLoan->tgl_wajib_kembali)) . "*\n\n" .
-            //                  "📚 *Buku yang dibawa:*\n" . $listBuku . "\n" .
-            //                  "Mohon dikembalikan tepat waktu. Terima Kasih! 🙏";
-            //         WhatsAppHelper::send($newLoan->member->no_telepon, $pesan);
-            //     }
-            // } catch (\Exception $waError) {
-            //     \Log::error('Gagal kirim WA: ' . $waError->getMessage());
-            // }
+             try {
+                $newLoan->load(['member', 'details.book']);
+                if (!empty($newLoan->member->no_telepon)) {
+                    $listBuku = "";
+                    foreach ($newLoan->details as $index => $detail) {
+                        $judul = $detail->book->judul ?? 'Buku';
+                        $listBuku .= ($index + 1) . ". $judul\n";
+                    }
+                    $pesan = "*BUKTI PEMINJAMAN BUKU*\n--------------------------------\n" .
+                             "Halo, *{$newLoan->member->nama_lengkap}*\n\n" .
+                             "Peminjaman berhasil dicatat.\n" .
+                             "📝 Kode: *{$newLoan->kode_transaksi}*\n" .
+                             "📅 Tgl Pinjam: " . date('d-m-Y', strtotime($newLoan->tgl_pinjam)) . "\n" .
+                             "📅 *Wajib Kembali: " . date('d-m-Y', strtotime($newLoan->tgl_wajib_kembali)) . "*\n\n" .
+                             "📚 *Buku yang dibawa:*\n" . $listBuku . "\n" .
+                             "Mohon dikembalikan tepat waktu. Terima Kasih! 🙏";
+                    WhatsAppHelper::send($newLoan->member->no_telepon, $pesan);
+                }
+            } catch (\Exception $waError) {
+                \Log::error('Gagal kirim WA: ' . $waError->getMessage());
+            }
 
             return redirect()->route('loans.index')
                 ->with('success', 'Transaksi Berhasil & Notifikasi WA Terkirim!')
@@ -168,73 +226,76 @@ class LoanController extends Controller
     }
 
     // =========================================================================
-    // 2. FITUR PENGEMBALIAN (RETURN) - SUPPORT PARSIAL
+    // 2. FITUR PENGEMBALIAN (RETURN) - DENGAN NOTIFIKASI WA GANTI RUGI
     // =========================================================================
 
     public function returnLoan(Request $request, string $id)
     {
-        $loan = Loan::with('details')->findOrFail($id);
+        $loan = Loan::with(['details.book', 'member'])->findOrFail($id);
 
         if ($loan->status_transaksi == 'selesai') {
             return back()->with('error', 'Transaksi ini sudah selesai sebelumnya!');
         }
 
-        // Validasi: Pastikan ada item yang dipilih (dicentang)
         $request->validate([
             'items_to_return' => 'required|array|min:1',
             'kondisi' => 'array',
         ]);
 
         try {
-            DB::transaction(function () use ($loan, $request) {
+            $pesanWa = "";
+            $nomorHp = $loan->member->no_telepon;
+            $totalTagihanFinal = 0; // Untuk menampung total denda
+
+            // 1. PROSES DB TRANSACTION (Hitung Denda & Update Stok)
+            DB::transaction(function () use ($loan, $request, &$pesanWa, &$totalTagihanFinal) {
                 $dendaPerHari = (int) (Setting::where('key', 'denda_harian')->value('value') ?? 500);
                 $nominalRusak = (int) (Setting::where('key', 'denda_rusak')->value('value') ?? 10000);
                 $today = Carbon::now()->startOfDay();
 
-                // ID Detail yang dicentang oleh admin
                 $selectedDetailIds = $request->input('items_to_return');
                 $inputKondisi = $request->input('kondisi', []);
 
                 $dendaGantiRugiSesiIni = 0;
+                $listKerusakan = [];
 
-                // 1. PROSES ITEM YANG DIPILIH SAJA
+                // A. LOOP ITEM
                 foreach ($selectedDetailIds as $detailId) {
-                    $detail = LoanDetail::where('id', $detailId)
+                    $detail = LoanDetail::with('book')->where('id', $detailId)
                                         ->where('loan_id', $loan->id)
-                                        ->where('status_item', 'dipinjam') // Hanya proses yang masih dipinjam
+                                        ->where('status_item', 'dipinjam')
                                         ->first();
 
                     if (!$detail) continue;
 
                     $kondisi = $inputKondisi[$detailId] ?? 'baik';
 
-                    // Update Status Item
                     $detail->update([
                         'status_item' => ($kondisi == 'hilang') ? 'hilang' : 'kembali',
                         'kondisi_kembali' => $kondisi
                     ]);
 
-                    // Update Stok & Hitung Denda Barang
                     if ($kondisi == 'hilang') {
                         Book::where('id', $detail->book_id)->increment('stok_hilang');
                         $hargaBuku = $detail->book->harga ?? 0;
                         $dendaGantiRugiSesiIni += $hargaBuku;
+                        $listKerusakan[] = "❌ {$detail->book->judul} (HILANG) - Rp " . number_format($hargaBuku, 0, ',', '.');
+
                     } elseif ($kondisi == 'rusak') {
                         Book::where('id', $detail->book_id)->increment('stok_rusak');
                         $dendaGantiRugiSesiIni += $nominalRusak;
+                        $listKerusakan[] = "⚠️ {$detail->book->judul} (RUSAK) - Rp " . number_format($nominalRusak, 0, ',', '.');
+
                     } else {
                         Book::where('id', $detail->book_id)->increment('stok_tersedia');
                     }
                 }
 
-                // 2. CEK SISA BUKU (Real-time Database Check)
-                $sisaBuku = LoanDetail::where('loan_id', $loan->id)
-                                      ->where('status_item', 'dipinjam')
-                                      ->count();
+                // B. CEK SISA & DENDA WAKTU
+                $sisaBuku = LoanDetail::where('loan_id', $loan->id)->where('status_item', 'dipinjam')->count();
+                $dendaWaktu = 0;
 
-                // 3. KEPUTUSAN FINAL
                 if ($sisaBuku === 0) {
-                    // SEMUA KEMBALI -> TUTUP TRANSAKSI & HITUNG DENDA WAKTU
                     $jatuhTempo = Carbon::parse($loan->tgl_wajib_kembali)->startOfDay();
                     $selisihHari = max(0, $jatuhTempo->diffInDays($today, false));
                     $dendaWaktu = $selisihHari * $dendaPerHari;
@@ -242,22 +303,24 @@ class LoanController extends Controller
                     $loan->tgl_kembali = now();
                     $loan->status_transaksi = 'selesai';
 
-                    // Total Denda Final = Denda Waktu + Denda Barang (Akumulasi)
-                    // Kita tambahkan denda ganti rugi sesi ini ke total yang mungkin sudah ada sebelumnya
-                    $loan->total_denda = ($loan->total_denda ?? 0) + $dendaWaktu + $dendaGantiRugiSesiIni;
-
-                } else {
-                    // MASIH ADA -> BIARKAN BERJALAN (PARSIAL)
-                    // Hanya tambahkan denda ganti rugi (jika ada) ke tagihan berjalan
-                    if ($dendaGantiRugiSesiIni > 0) {
-                        $loan->total_denda = ($loan->total_denda ?? 0) + $dendaGantiRugiSesiIni;
+                    if($dendaWaktu > 0) {
+                        $listKerusakan[] = "⏳ Keterlambatan ({$selisihHari} hari) - Rp " . number_format($dendaWaktu, 0, ',', '.');
                     }
                 }
 
-                // 4. STATUS PEMBAYARAN
+                // C. UPDATE TOTAL DENDA
+                $totalTambahan = $dendaWaktu + $dendaGantiRugiSesiIni;
+                if ($totalTambahan > 0) {
+                    $loan->total_denda = ($loan->total_denda ?? 0) + $totalTambahan;
+                }
+
+                $totalTagihanFinal = $loan->total_denda; // Simpan ke var luar utk Midtrans
+
+                // D. STATUS PEMBAYARAN
                 if ($loan->total_denda > 0) {
                     $loan->status_pembayaran = 'pending';
-                    // Jika admin mencentang "Bayar Lunas" di modal (untuk denda sesi ini)
+
+                    // Cek jika Bayar Tunai
                     if ($request->has('denda_lunas') && $sisaBuku === 0) {
                         $loan->status_pembayaran = 'paid';
                         $loan->tipe_pembayaran = 'tunai';
@@ -267,9 +330,83 @@ class LoanController extends Controller
                 }
 
                 $loan->save();
+
+                // E. SIAPKAN LIST TEXT WA (Link ditambahkan nanti di luar transaction)
+                if (count($listKerusakan) > 0 || $totalTambahan > 0) {
+                    $pesanWa = "*INVOICE PENGEMBALIAN BUKU*\n";
+                    $pesanWa .= "Halo, {$loan->member->nama_lengkap}\n\n";
+                    $pesanWa .= "Berikut rincian tagihan:\n";
+                    $pesanWa .= implode("\n", $listKerusakan);
+                    $pesanWa .= "\n--------------------------------\n";
+                    $pesanWa .= "*Total Tagihan: Rp " . number_format($totalTagihanFinal, 0, ',', '.') . "*\n";
+                }
             });
 
-            return back()->with('success', 'Buku terpilih berhasil dikembalikan.');
+            // 2. GENERATE MIDTRANS LINK (JIKA BELUM LUNAS)
+            // Dilakukan di luar transaction DB agar tidak menahan koneksi database saat request ke API Midtrans
+            if ($loan->status_pembayaran == 'pending' && $totalTagihanFinal > 0) {
+
+                $this->configureMidtrans(); // Panggil konfigurasi
+
+                $orderId = 'DENDA-RETURN-' . $loan->id . '-' . time(); // ID Unik
+
+                $params = [
+                    'transaction_details' => [
+                        'order_id' => $orderId,
+                        'gross_amount' => $totalTagihanFinal,
+                    ],
+                    'customer_details' => [
+                        'first_name' => $loan->member->nama_lengkap,
+                        'phone' => $loan->member->no_telepon,
+                    ],
+                    'item_details' => [[
+                        'id' => 'TAGIHAN-DENDA',
+                        'price' => $totalTagihanFinal,
+                        'quantity' => 1,
+                        'name' => "Total Denda & Ganti Rugi"
+                    ]],
+                    'expiry' => [
+                        'start_time' => date("Y-m-d H:i:s O"),
+                        'unit' => 'days',
+                        'duration' => 7
+                    ],
+                ];
+
+                try {
+                    $paymentUrl = \Midtrans\Snap::createTransaction($params)->redirect_url;
+
+                    // Simpan Link ke DB
+                    $loan->update([
+                        'midtrans_order_id' => $orderId,
+                        'midtrans_url' => $paymentUrl,
+                        'tipe_pembayaran' => 'online'
+                    ]);
+
+                    // Tambahkan Link ke Pesan WA
+                    $pesanWa .= "Status: *BELUM LUNAS*\n\n";
+                    $pesanWa .= "👉 *Klik Link untuk Bayar (Gopay/Transfer):*\n";
+                    $pesanWa .= $paymentUrl . "\n\n";
+
+                } catch (\Exception $e) {
+                    \Log::error("Gagal Generate Link Midtrans: " . $e->getMessage());
+                    $pesanWa .= "Status: *BELUM LUNAS* (Silakan bayar tunai di perpustakaan)\n\n";
+                }
+
+            } elseif ($loan->status_pembayaran == 'paid') {
+                $pesanWa .= "Status: *LUNAS (TUNAI)* ✅\n\n";
+            }
+
+            // 3. KIRIM WA FINAL
+            if (!empty($pesanWa) && !empty($nomorHp)) {
+                $pesanWa .= "Terima Kasih 🙏";
+                try {
+                    WhatsAppHelper::send($nomorHp, $pesanWa);
+                } catch (\Exception $e) {
+                    \Log::error("Gagal kirim WA: " . $e->getMessage());
+                }
+            }
+
+            return back()->with('success', 'Buku berhasil dikembalikan. Notifikasi tagihan terkirim.');
 
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal memproses: ' . $e->getMessage());
@@ -280,7 +417,6 @@ class LoanController extends Controller
     // 3. FITUR MIDTRANS (PAYMENT GATEWAY)
     // =========================================================================
 
-    // Konfigurasi Midtrans (Private Function agar tidak copy-paste berulang)
     private function configureMidtrans()
     {
         Config::$serverKey = config('midtrans.server_key');
@@ -291,7 +427,7 @@ class LoanController extends Controller
 
     public function checkPaymentStatus($id)
     {
-        $loan = Loan::findOrFail($id);
+        $loan = Loan::with('member')->findOrFail($id); // Load member untuk ambil No HP
         if (empty($loan->midtrans_order_id)) return back()->with('error', 'Belum ada Order ID Midtrans.');
 
         $this->configureMidtrans();
@@ -300,8 +436,14 @@ class LoanController extends Controller
             $status = Transaction::status($loan->midtrans_order_id);
             /** @var object $status */
             if ($status->transaction_status == 'settlement' || $status->transaction_status == 'capture') {
+
+                // Update Status
                 $loan->update(['status_pembayaran' => 'paid', 'tipe_pembayaran' => 'online']);
-                return back()->with('success', 'Status LUNAS.');
+
+                // [BARU] Kirim Notifikasi LUNAS
+                $this->sendLunasWA($loan);
+
+                return back()->with('success', 'Status LUNAS. Notifikasi WA terkirim.');
             } else if ($status->transaction_status == 'expire') {
                 $loan->update(['status_pembayaran' => 'unpaid', 'midtrans_url' => null]);
                 return back()->with('error', 'Pembayaran Kadaluarsa.');
@@ -315,7 +457,8 @@ class LoanController extends Controller
 
     public function refreshAllStatus()
     {
-        $pendingLoans = Loan::where('status_pembayaran', 'pending')->whereNotNull('midtrans_order_id')->get();
+        // Load member juga
+        $pendingLoans = Loan::with('member')->where('status_pembayaran', 'pending')->whereNotNull('midtrans_order_id')->get();
         if ($pendingLoans->isEmpty()) return back()->with('info', 'Tidak ada transaksi pending.');
 
         $this->configureMidtrans();
@@ -326,7 +469,12 @@ class LoanController extends Controller
                 $status = Transaction::status($loan->midtrans_order_id);
                 /** @var object $status */
                 if ($status->transaction_status == 'settlement' || $status->transaction_status == 'capture') {
+
                     $loan->update(['status_pembayaran' => 'paid', 'tipe_pembayaran' => 'online']);
+
+                    // [BARU] Kirim Notifikasi LUNAS
+                    $this->sendLunasWA($loan);
+
                     $updatedCount++;
                 } else if ($status->transaction_status == 'expire') {
                     $loan->update(['status_pembayaran' => 'unpaid', 'midtrans_url' => null]);
@@ -335,17 +483,47 @@ class LoanController extends Controller
         }
 
         return $updatedCount > 0
-            ? back()->with('success', "$updatedCount transaksi diperbarui jadi LUNAS.")
+            ? back()->with('success', "$updatedCount transaksi diperbarui jadi LUNAS & Notifikasi dikirim.")
             : back()->with('info', 'Belum ada pembayaran baru masuk.');
+    }
+
+    // --- [METODE TAMBAHAN] Helper Kirim WA Lunas ---
+    private function sendLunasWA($loan) {
+        if (!empty($loan->member->no_telepon)) {
+            $pesan = "*PEMBAYARAN DITERIMA* 💰\n\n";
+            $pesan .= "Halo, {$loan->member->nama_lengkap}\n";
+            $pesan .= "Terima kasih, pembayaran denda untuk Transaksi *{$loan->kode_transaksi}* telah kami terima via Online.\n\n";
+            $pesan .= "Nominal: Rp " . number_format($loan->total_denda, 0, ',', '.') . "\n";
+            $pesan .= "Status: *LUNAS* ✅\n\n";
+            $pesan .= "Sistem Perpustakaan.";
+
+            try {
+                WhatsAppHelper::send($loan->member->no_telepon, $pesan);
+            } catch (\Exception $e) {
+                // Biarkan lanjut meski WA gagal
+                \Log::error("Gagal kirim WA Lunas: " . $e->getMessage());
+            }
+        }
     }
 
     public function payLateFine($id)
     {
-        $loan = Loan::findOrFail($id);
+        // [UPDATE] Tambahkan with('member') agar data no_telepon terbaca
+        $loan = Loan::with('member')->findOrFail($id);
+
         if ($loan->status_transaksi == 'selesai' && $loan->status_pembayaran != 'paid') {
-            $loan->update(['status_pembayaran' => 'paid', 'tipe_pembayaran' => 'tunai']);
-            return back()->with('success', 'Pembayaran tunai berhasil.');
+
+            $loan->update([
+                'status_pembayaran' => 'paid',
+                'tipe_pembayaran' => 'tunai'
+            ]);
+
+            // [BARU] Panggil Helper WA Lunas (Sama seperti Midtrans)
+            $this->sendLunasWA($loan);
+
+            return back()->with('success', 'Pembayaran tunai berhasil dicatat & Notifikasi WA terkirim.');
         }
-        return back()->with('error', 'Transaksi tidak valid.');
+
+        return back()->with('error', 'Transaksi tidak valid atau sudah lunas.');
     }
 }

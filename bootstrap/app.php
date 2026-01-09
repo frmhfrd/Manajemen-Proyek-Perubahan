@@ -4,7 +4,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\KioskGuard;
-use App\Http\Middleware\RoleMiddleware; // <--- PERBAIKAN: Gunakan RoleMiddleware, bukan CheckRole
+use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\IsAdmin;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'kiosk.guard' => KioskGuard::class,
             'role'        => RoleMiddleware::class, // <--- Pastikan ini merujuk ke RoleMiddleware
+            'admin'       =>IsAdmin::class,
         ]);
 
     })

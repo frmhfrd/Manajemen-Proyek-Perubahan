@@ -53,6 +53,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/books/trash', [BookController::class, 'trash'])->name('books.trash');
     Route::put('/books/{id}/restore', [BookController::class, 'restore'])->name('books.restore');
 
+    // Buku Rusak
+    Route::get('/books/damaged', [BookController::class, 'indexRusak'])->name('books.rusak');
+    Route::post('/books/damaged/{id}', [BookController::class, 'processRusak'])->name('books.process-rusak');
+
     // Standar CRUD Buku
     Route::get('/books', [BookController::class, 'index'])->name('books.index');
     Route::get('/books/create', [BookController::class, 'create'])->name('books.create');
