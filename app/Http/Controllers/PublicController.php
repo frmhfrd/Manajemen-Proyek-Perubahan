@@ -165,7 +165,7 @@ class PublicController extends Controller
 
             // --- [NEW] KIRIM NOTIFIKASI WA SETELAH TRANSAKSI SUKSES ---
             try {
-                if ($member->no_hp) {
+                if ($member->no_telepon) {
                     $tglKembali = Carbon::now()->addDays((int)$request->durasi)->format('d-m-Y');
 
                     $message = "Halo *{$member->nama_lengkap}*,\n\n";
@@ -362,7 +362,7 @@ class PublicController extends Controller
                 // Ambil data member (kita perlu fetch ulang karena di request hanya ada ID)
                 $member = Member::find($request->member_id);
 
-                if ($member && $member->no_hp) {
+                if ($member && $member->no_telepon) {
                     $waMsg = "Halo *{$member->nama_lengkap}*,\n\n";
                     $waMsg .= "Terima kasih sudah mengembalikan buku via Anjungan Mandiri. 🔄\n\n";
 
