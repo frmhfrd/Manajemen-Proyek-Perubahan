@@ -332,19 +332,27 @@ class LoanController extends Controller
                 $loan->save();
 
                 // E. SIAPKAN LIST TEXT WA (Link ditambahkan nanti di luar transaction)
-                if (count($listKerusakan) > 0 || $totalTambahan > 0) {
-                    $pesanWa = "*INVOICE PENGEMBALIAN BUKU*\n";
+                if ($totalTagihanFinal > 0) {
+                    // KASUS 1: ADA DENDA (Rusak / Hilang / Telat)
+                    $pesanWa = "*TAGIHAN PENGEMBALIAN BUKU* ⚠️\n";
                     $pesanWa .= "Halo, {$loan->member->nama_lengkap}\n\n";
-                    $pesanWa .= "Berikut rincian tagihan:\n";
-                    $pesanWa .= implode("\n", $listKerusakan);
+                    $pesanWa .= "Buku telah dikembalikan, namun terdapat catatan denda/ganti rugi:\n";
+                    $pesanWa .= implode("\n", $listKerusakan); // List detail kerusakan
                     $pesanWa .= "\n--------------------------------\n";
                     $pesanWa .= "*Total Tagihan: Rp " . number_format($totalTagihanFinal, 0, ',', '.') . "*\n";
+                } else {
+                    // KASUS 2: PERFECT RETURN (Tepat Waktu & Baik)
+                    // Pesan apresiasi karena disiplin
+                    $pesanWa = "*PENGEMBALIAN BERHASIL* ✅\n";
+                    $pesanWa .= "Halo, {$loan->member->nama_lengkap}\n\n";
+                    $pesanWa .= "Terima kasih telah mengembalikan buku tepat waktu dan dalam kondisi baik. 👍\n\n";
+                    $pesanWa .= "Selamat membaca buku lainnya! 📚";
                 }
             });
 
             // 2. GENERATE MIDTRANS LINK (JIKA BELUM LUNAS)
             // Dilakukan di luar transaction DB agar tidak menahan koneksi database saat request ke API Midtrans
-            if ($loan->status_pembayaran == 'pending' && $totalTagihanFinal > 0) {
+            if ($totalTagihanFinal > 0 && $loan->status_pembayaran != 'paid') {
 
                 $this->configureMidtrans(); // Panggil konfigurasi
 
@@ -383,22 +391,26 @@ class LoanController extends Controller
                     ]);
 
                     // Tambahkan Link ke Pesan WA
-                    $pesanWa .= "Status: *BELUM LUNAS*\n\n";
-                    $pesanWa .= "👉 *Klik Link untuk Bayar (Gopay/Transfer):*\n";
-                    $pesanWa .= $paymentUrl . "\n\n";
+                    $pesanWa .= "\nStatus: *BELUM LUNAS*\n";
+                    $pesanWa .= "Silakan klik link di bawah untuk pembayaran (Gopay/Transfer):\n";
+                    $pesanWa .= "👉 $paymentUrl\n\n";
+                    $pesanWa .= "Harap segera diselesaikan. Terima kasih. 🙏";
 
                 } catch (\Exception $e) {
-                    \Log::error("Gagal Generate Link Midtrans: " . $e->getMessage());
-                    $pesanWa .= "Status: *BELUM LUNAS* (Silakan bayar tunai di perpustakaan)\n\n";
+                    \Log::error("Midtrans Error: " . $e->getMessage());
+                    $pesanWa .= "\nStatus: *BELUM LUNAS*\n";
+                    $pesanWa .= "Mohon lakukan pembayaran tunai di meja petugas. Terima kasih. 🙏";
                 }
 
-            } elseif ($loan->status_pembayaran == 'paid') {
-                $pesanWa .= "Status: *LUNAS (TUNAI)* ✅\n\n";
+            }
+            // Jika LUNAS (Misal bayar tunai langsung saat itu juga / dipotong saldo)
+            elseif ($totalTagihanFinal > 0 && $loan->status_pembayaran == 'paid') {
+                $pesanWa .= "\nStatus: *LUNAS (TUNAI)* ✅\n";
+                $pesanWa .= "Terima kasih atas tanggung jawabnya. 🙏";
             }
 
             // 3. KIRIM WA FINAL
             if (!empty($pesanWa) && !empty($nomorHp)) {
-                $pesanWa .= "Terima Kasih 🙏";
                 try {
                     WhatsAppHelper::send($nomorHp, $pesanWa);
                 } catch (\Exception $e) {
@@ -406,7 +418,7 @@ class LoanController extends Controller
                 }
             }
 
-            return back()->with('success', 'Buku berhasil dikembalikan. Notifikasi tagihan terkirim.');
+            return back()->with('success', 'Proses pengembalian berhasil disimpan.');
 
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal memproses: ' . $e->getMessage());
