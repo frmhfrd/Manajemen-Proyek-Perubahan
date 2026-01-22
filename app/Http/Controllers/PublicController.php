@@ -174,7 +174,7 @@ class PublicController extends Controller
                     $message .= "Wajib Kembali: {$tglKembali}\n\n";
                     $message .= "Harap dijaga dengan baik ya! 📚";
 
-                    WhatsAppHelper::sendMessage($member->no_hp, $message);
+                    WhatsAppHelper::send($member->no_hp, $message);
                 }
             } catch (\Exception $e) {
                 Log::error("Gagal kirim WA Peminjaman: " . $e->getMessage());
