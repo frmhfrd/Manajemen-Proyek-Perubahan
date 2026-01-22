@@ -107,8 +107,8 @@ class PublicController extends Controller
 
             if ($dendaNunggak) {
                 $totalHutang = Loan::where('member_id', $member->id)
-                                   ->whereIn('status_pembayaran', ['unpaid', 'pending'])
-                                   ->sum('total_denda');
+                                ->whereIn('status_pembayaran', ['unpaid', 'pending'])
+                                ->sum('total_denda');
                 throw new \Exception('DITOLAK: Ada tunggakan denda Rp ' . number_format($totalHutang) . '. Lunasi dulu ya!');
             }
 
@@ -118,7 +118,7 @@ class PublicController extends Controller
             // Hitung jumlah BUKU FISIK yang sedang dipinjam
             $jumlahBukuSedangDipinjam = LoanDetail::whereHas('loan', function($q) use ($member) {
                                             $q->where('member_id', $member->id)
-                                              ->where('status_transaksi', 'berjalan');
+                                            ->where('status_transaksi', 'berjalan');
                                         })
                                         ->where('status_item', 'dipinjam')
                                         ->count();
@@ -162,6 +162,24 @@ class PublicController extends Controller
                 // Kurangi Stok
                 Book::where('id', $request->book_id)->decrement('stok_tersedia');
             });
+
+            // --- [NEW] KIRIM NOTIFIKASI WA SETELAH TRANSAKSI SUKSES ---
+            try {
+                if ($member->no_hp) {
+                    $tglKembali = Carbon::now()->addDays((int)$request->durasi)->format('d-m-Y');
+
+                    $message = "Halo *{$member->nama_lengkap}*,\n\n";
+                    $message .= "Peminjaman Mandiri Berhasil! ✅\n";
+                    $message .= "Judul: *{$book->judul}*\n";
+                    $message .= "Wajib Kembali: {$tglKembali}\n\n";
+                    $message .= "Harap dijaga dengan baik ya! 📚";
+
+                    WhatsAppHelper::sendMessage($member->no_hp, $message);
+                }
+            } catch (\Exception $e) {
+                Log::error("Gagal kirim WA Peminjaman: " . $e->getMessage());
+            }
+            // ----------------------------------------------------------
 
             return response()->json(['status' => 'success', 'message' => 'Peminjaman Berhasil! Silakan ambil bukunya.']);
 
@@ -268,9 +286,9 @@ class PublicController extends Controller
                     foreach ($detailsToReturn as $item) {
                         // Cari detail spesifik LANGSUNG KE DB
                         $dbDetail = LoanDetail::where('id', $item['detail_id'])
-                                              ->where('loan_id', $loan->id)
-                                              ->where('status_item', 'dipinjam') // Pastikan hanya update yang dipinjam
-                                              ->first();
+                                            ->where('loan_id', $loan->id)
+                                            ->where('status_item', 'dipinjam') // Pastikan hanya update yang dipinjam
+                                            ->first();
 
                         if (!$dbDetail) continue;
 
@@ -297,8 +315,8 @@ class PublicController extends Controller
                     // --- STEP 2: HITUNG SISA BUKU (DIRECT QUERY) ---
                     // Jangan pakai $loan->details (cache), tapi query baru ke tabel loan_details
                     $sisaBuku = LoanDetail::where('loan_id', $loan->id)
-                                          ->where('status_item', 'dipinjam')
-                                          ->count();
+                                        ->where('status_item', 'dipinjam')
+                                        ->count();
 
                     // --- STEP 3: KEPUTUSAN FINAL ---
                     if ($sisaBuku === 0) {
@@ -338,6 +356,30 @@ class PublicController extends Controller
             if ($totalTagihan > 0) {
                 $msg .= ' Tagihan denda sesi ini: Rp ' . number_format($totalTagihan, 0, ',', '.') . '. Harap lunasi di admin.';
             }
+
+            // --- [NEW] KIRIM NOTIFIKASI WA SETELAH TRANSAKSI SUKSES ---
+            try {
+                // Ambil data member (kita perlu fetch ulang karena di request hanya ada ID)
+                $member = Member::find($request->member_id);
+
+                if ($member && $member->no_hp) {
+                    $waMsg = "Halo *{$member->nama_lengkap}*,\n\n";
+                    $waMsg .= "Terima kasih sudah mengembalikan buku via Anjungan Mandiri. 🔄\n\n";
+
+                    if ($totalTagihan > 0) {
+                        $formattedDenda = number_format($totalTagihan, 0, ',', '.');
+                        $waMsg .= "⚠️ *Catatan:* Terdapat tagihan denda/ganti rugi sebesar *Rp {$formattedDenda}*.\n";
+                        $waMsg .= "Mohon segera selesaikan administrasi di petugas perpustakaan.";
+                    } else {
+                        $waMsg .= "Semua buku telah kembali dengan baik. Terima kasih! 👍";
+                    }
+
+                    WhatsAppHelper::sendMessage($member->no_hp, $waMsg);
+                }
+            } catch (\Exception $e) {
+                Log::error("Gagal kirim WA Pengembalian: " . $e->getMessage());
+            }
+            // ----------------------------------------------------------
 
             return response()->json(['status' => 'success', 'message' => $msg]);
 
