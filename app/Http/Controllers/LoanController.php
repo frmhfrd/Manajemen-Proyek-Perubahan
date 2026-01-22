@@ -210,7 +210,7 @@ class LoanController extends Controller
                              "📅 *Wajib Kembali: " . date('d-m-Y', strtotime($newLoan->tgl_wajib_kembali)) . "*\n\n" .
                              "📚 *Buku yang dibawa:*\n" . $listBuku . "\n" .
                              "Mohon dikembalikan tepat waktu. Terima Kasih! 🙏";
-                    WhatsAppHelper::send($newLoan->member->no_hp, $pesan);
+                    WhatsAppHelper::send($newLoan->member->no_telepon, $pesan);
                 }
             } catch (\Exception $waError) {
                 \Log::error('Gagal kirim WA: ' . $waError->getMessage());
